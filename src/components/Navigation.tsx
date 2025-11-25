@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useSession } from "@/context/SessionProvider";
 import { AuthDialog } from "./AuthDialog";
 import { supabase } from "@/lib/supabaseClient";
+import { Link, useNavigate, useLocation } from "react-router-dom"; // Import Link, useNavigate, and useLocation
 
 const navLinks = [
   { name: "Home", href: "#home" },
@@ -22,6 +23,8 @@ const Navigation = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
   const { session } = useSession();
+  const navigate = useNavigate(); // Initialize useNavigate
+  const location = useLocation(); // Initialize useLocation
 
   // Handle scroll effect
   useEffect(() => {
@@ -33,16 +36,22 @@ const Navigation = () => {
   }, []);
 
   const scrollToSection = (href: string) => {
-    const element = document.querySelector(href);
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth", block: "start" });
-      setIsMobileMenuOpen(false);
+    // If not on the homepage, navigate to homepage first, then handle scroll
+    if (location.pathname !== "/") {
+      navigate(`/${href}`); // Navigate to /#section
+    } else {
+      // If already on homepage, just scroll
+      const element = document.querySelector(href);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
     }
+    setIsMobileMenuOpen(false); // Close mobile menu regardless
   };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    window.location.reload();
+    navigate("/"); // Navigate to home after logout
   };
 
   const AuthButton = () => {
@@ -114,6 +123,19 @@ const Navigation = () => {
                   {link.name}
                 </Button>
               ))}
+              {session && ( // Conditionally render Dashboard link for authenticated users
+                <Button
+                  key="Dashboard"
+                  variant="ghost"
+                  onClick={() => {
+                    navigate("/dashboard");
+                    setIsMobileMenuOpen(false); // Close mobile menu if open
+                  }}
+                  className="text-foreground hover:text-primary hover:bg-primary/10 transition-all duration-300 font-semibold"
+                >
+                  Dashboard
+                </Button>
+              )}
             </div>
 
             {/* Auth Button */}
@@ -152,6 +174,18 @@ const Navigation = () => {
                       {link.name}
                     </button>
                   ))}
+                  {session && ( // Conditionally render Dashboard link for authenticated users in mobile
+                    <button
+                      key="Dashboard"
+                      onClick={() => {
+                        navigate("/dashboard");
+                        setIsMobileMenuOpen(false); // Close mobile menu after navigation
+                      }}
+                      className="text-left text-xl font-semibold text-foreground hover:text-primary transition-colors duration-300 py-2"
+                    >
+                      Dashboard
+                    </button>
+                  )}
                   <div className="mt-4">
                     <AuthButton />
                   </div>
