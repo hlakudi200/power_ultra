@@ -5,6 +5,7 @@ import { Menu, X, Dumbbell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/context/SessionProvider";
 import { AuthDialog } from "./AuthDialog";
+import { NotificationBell } from "./NotificationBell";
 import { supabase } from "@/lib/supabaseClient";
 import { Link, useNavigate, useLocation } from "react-router-dom"; // Import Link, useNavigate, and useLocation
 
@@ -74,6 +75,7 @@ const Navigation = () => {
 
     return (
       <div className="flex items-center gap-2">
+        <NotificationBell />
         <span className="text-sm font-medium text-foreground hidden sm:inline truncate" title={displayName}>
           {displayName}
         </span>

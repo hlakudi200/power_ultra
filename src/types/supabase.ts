@@ -8,11 +8,16 @@ export interface ScheduledClass {
   start_time: string;
   end_time: string;
   max_capacity: number;
+  is_cancelled?: boolean;
+  cancellation_reason?: string | null;
+  booking_count?: number;
   classes: {
     id: string; // class id
     name: string;
     description: string | null;
-    instructor: string | null;
     image_url: string | null;
+  } | null;
+  instructors?: {
+    name: string;
   } | null;
 }

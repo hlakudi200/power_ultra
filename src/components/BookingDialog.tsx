@@ -8,6 +8,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "@/context/SessionProvider";
 import { supabase } from "@/lib/supabaseClient";
@@ -43,16 +44,61 @@ const BookingDialog = ({
 
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.from("bookings").insert({
-        schedule_id: scheduleId,
-        user_id: session.user.id,
-      });
+      // First, check if there's an existing cancelled booking
+      const { data: existingBooking, error: checkError } = await supabase
+        .from("bookings")
+        .select("id, status")
+        .eq("schedule_id", scheduleId)
+        .eq("user_id", session.user.id)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        // PGRST116 = no rows returned, which is fine
+        throw new Error(checkError.message);
+      }
+
+      let error;
+
+      if (existingBooking) {
+        // Reactivate the cancelled booking
+        if (existingBooking.status === 'cancelled') {
+          const { error: updateError } = await supabase
+            .from("bookings")
+            .update({ status: 'confirmed' })
+            .eq("id", existingBooking.id);
+
+          error = updateError;
+        } else {
+          // Already has an active booking
+          throw new Error("You have already booked this class.");
+        }
+      } else {
+        // Create a new booking
+        const { error: insertError } = await supabase.from("bookings").insert({
+          schedule_id: scheduleId,
+          user_id: session.user.id,
+          status: 'confirmed',
+        });
+
+        error = insertError;
+      }
 
       if (error) {
-        // Handle potential unique constraint violation (already booked)
+        // Handle specific error codes
         if (error.code === '23505') {
           throw new Error("You have already booked this class.");
         }
+
+        // Handle server-side validation errors
+        if (error.message.includes('active membership')) {
+          throw new Error("Your membership has expired. Please renew to book classes.");
+        }
+
+        if (error.message.includes('full capacity')) {
+          throw new Error("Sorry, this class is full. Please try another time slot.");
+        }
+
+        // Generic error
         throw new Error(error.message);
       }
 
@@ -65,7 +111,7 @@ const BookingDialog = ({
       try {
         const { error: invokeError } = await supabase.functions.invoke("send-booking-confirmation", {
           body: {
-            name: session.user.user_metadata?.full_name || session.user.email,
+            name: session.user.user_metadata?.first_name || session.user.user_metadata?.full_name || session.user.email,
             email: session.user.email,
             className,
             classTime,
@@ -73,14 +119,15 @@ const BookingDialog = ({
         });
         if (invokeError) {
           console.error("Failed to send booking confirmation email:", invokeError);
+          // Don't show error to user - booking was successful
         }
       } catch (e) {
         console.error("Unexpected error invoking email function:", e);
+        // Don't show error to user - booking was successful
       }
 
       onOpenChange(false);
-    } catch (error: any)
-    {
+    } catch (error: any) {
       toast({
         title: "Booking Failed",
         description: error.message || "There was an error processing your booking. Please try again.",
@@ -124,7 +171,14 @@ const BookingDialog = ({
               className="flex-1 bg-gradient-primary text-primary-foreground hover:shadow-glow font-bold"
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Booking..." : "Confirm Booking"}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Booking...
+                </>
+              ) : (
+                "Confirm Booking"
+              )}
             </Button>
           </div>
         </DialogFooter>

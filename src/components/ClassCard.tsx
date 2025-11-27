@@ -12,6 +12,9 @@ interface ClassCardProps {
   description?: string;
   color?: "primary" | "secondary" | "accent" | string;
   onBook: () => void;
+  isFull?: boolean;
+  bookingCount?: number;
+  maxCapacity?: number;
 }
 
 const intensityColors: { [key: string]: string } = {
@@ -36,17 +39,41 @@ const ClassCard = ({
   description = "No description available.",
   color = "primary",
   onBook,
+  isFull = false,
+  bookingCount,
+  maxCapacity,
 }: ClassCardProps) => {
+  const capacityDisplay = bookingCount !== undefined && maxCapacity !== undefined
+    ? `${bookingCount}/${maxCapacity}`
+    : capacity;
+
+  const isNearlyFull = bookingCount !== undefined && maxCapacity !== undefined
+    ? (bookingCount / maxCapacity) >= 0.8 && !isFull
+    : false;
+
   return (
     <div
       className={cn(
         "group p-6 rounded-lg border-2 transition-all duration-300 hover-scale",
-        colorVariants[color]
+        colorVariants[color],
+        isFull && "opacity-75"
       )}
     >
       <div className="flex items-start justify-between mb-4">
-        <div>
-          <h3 className="text-2xl font-black text-foreground mb-1">{name}</h3>
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <h3 className="text-2xl font-black text-foreground mb-1">{name}</h3>
+            {isFull && (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-destructive/10 text-destructive">
+                FULL
+              </span>
+            )}
+            {isNearlyFull && (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700">
+                FILLING UP
+              </span>
+            )}
+          </div>
           <p className="text-muted-foreground font-semibold">with {instructor}</p>
         </div>
         <div className="flex items-center gap-1">
@@ -66,16 +93,21 @@ const ClassCard = ({
         </div>
         <div className="flex items-center gap-2">
           <Users className="w-4 h-4" />
-          <span className="font-semibold">{capacity}</span>
+          <span className={cn(
+            "font-semibold",
+            isFull && "text-destructive",
+            isNearlyFull && "text-orange-600"
+          )}>{capacityDisplay}</span>
         </div>
         <span className="font-semibold">{duration}</span>
       </div>
 
       <Button
         onClick={onBook}
-        className="w-full bg-gradient-primary text-primary-foreground hover:shadow-glow font-bold"
+        disabled={isFull}
+        className="w-full bg-gradient-primary text-primary-foreground hover:shadow-glow font-bold disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        BOOK NOW
+        {isFull ? "CLASS FULL" : "BOOK NOW"}
       </Button>
     </div>
   );

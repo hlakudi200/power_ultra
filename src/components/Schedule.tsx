@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
 import ClassCard from "./ClassCard";
 import BookingDialog from "./BookingDialog";
 import { supabase } from "@/lib/supabaseClient";
@@ -19,18 +20,44 @@ const fetchSchedule = async () => {
       start_time,
       end_time,
       max_capacity,
+      is_cancelled,
+      cancellation_reason,
       classes (
         id,
         name,
-        description,
-        instructor
+        description
+      ),
+      instructors (
+        name
       )
     `
-    );
+    )
+    .eq("is_cancelled", false); // Only show active classes to members
 
   if (error) {
     throw new Error("Failed to fetch schedule: " + error.message);
   }
+
+  // Fetch booking counts for each schedule
+  if (data && data.length > 0) {
+    const scheduleWithBookings = await Promise.all(
+      data.map(async (schedule) => {
+        const { count } = await supabase
+          .from("bookings")
+          .select("*", { count: "exact", head: true })
+          .eq("schedule_id", schedule.id)
+          .in("status", ["confirmed", "pending"]);
+
+        return {
+          ...schedule,
+          booking_count: count || 0,
+        };
+      })
+    );
+
+    return scheduleWithBookings as ScheduledClass[];
+  }
+
   return data as ScheduledClass[];
 };
 
@@ -165,11 +192,31 @@ const Schedule = () => {
         </div>
 
         {/* Weekly Schedule */}
-        {isLoading && <p className="text-center text-xl">Loading schedule...</p>}
+        {isLoading && (
+          <div className="space-y-8">
+            {/* Skeleton for tab navigation */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
+              {Array.from({ length: 7 }).map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full rounded-md" />
+              ))}
+            </div>
+            {/* Skeleton for class cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-64 w-full rounded-lg" />
+              ))}
+            </div>
+          </div>
+        )}
         {error && (
-          <p className="text-center text-xl text-red-500">
-            Could not load schedule. Please try again later.
-          </p>
+          <div className="text-center py-12 bg-card/30 rounded-lg border border-destructive/50">
+            <p className="text-xl text-destructive font-semibold mb-2">
+              Failed to Load Schedule
+            </p>
+            <p className="text-muted-foreground">
+              Could not load schedule. Please check your connection and try again later.
+            </p>
+          </div>
         )}
         {schedule && (
           <Tabs
@@ -204,11 +251,14 @@ const Schedule = () => {
                           <ClassCard
                             key={c.id}
                             name={c.classes.name}
-                            instructor={c.classes.instructor || "N/A"}
+                            instructor={c.instructors?.name || "TBA"}
                             time={formatTime(c.start_time)}
                             description={
                               c.classes.description || "No description available."
                             }
+                            bookingCount={c.booking_count}
+                            maxCapacity={c.max_capacity}
+                            isFull={(c.booking_count || 0) >= (c.max_capacity || 20)}
                             onBook={() =>
                               handleBooking(
                                 c.classes!.name,

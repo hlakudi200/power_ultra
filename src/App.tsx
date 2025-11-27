@@ -8,6 +8,18 @@ import SetupProfile from "./pages/SetupProfile";
 import Dashboard from "./pages/Dashboard";
 import Layout from "./components/Layout"; // Import the Layout component
 
+// Admin imports
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import Members from "./pages/admin/Members";
+import Classes from "./pages/admin/Classes";
+import Schedule from "./pages/admin/Schedule";
+import Bookings from "./pages/admin/Bookings";
+import Inquiries from "./pages/admin/Inquiries";
+import Memberships from "./pages/admin/Memberships";
+import Instructors from "./pages/admin/Instructors";
+import Analytics from "./pages/admin/Analytics";
+import Settings from "./pages/admin/Settings";
+
 import { SessionProvider, useSession } from "./context/SessionProvider";
 import { useToast } from "@/components/ui/use-toast"; // Keep useToast for ProtectedRoute
 import { supabase } from "@/lib/supabaseClient"; // Keep supabase for ProtectedRoute
@@ -43,7 +55,7 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
         setIsProfileLoading(true);
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("membership_expiry_date")
+          .select("membership_expiry_date, is_admin")
           .eq("id", session.user.id)
           .single();
 
@@ -51,8 +63,13 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
           console.error("Error fetching profile for membership check:", profileError);
           setHasActiveMembership(false); // Assume no active membership on error
         } else {
-          const expiryDate = profile?.membership_expiry_date ? new Date(profile.membership_expiry_date) : null;
-          setHasActiveMembership(expiryDate && expiryDate > new Date());
+          // Admins don't need active membership
+          if (profile?.is_admin) {
+            setHasActiveMembership(true);
+          } else {
+            const expiryDate = profile?.membership_expiry_date ? new Date(profile.membership_expiry_date) : null;
+            setHasActiveMembership(expiryDate && expiryDate > new Date());
+          }
         }
         setIsProfileLoading(false);
         setIsMembershipChecked(true);
@@ -104,20 +121,32 @@ const AppRoutes = () => {
       <Route path="/" element={<Layout />}> {/* Use Layout as parent for all main routes */}
         <Route index element={<Index />} /> {/* Index route for / */}
         <Route path="/setup-profile" element={<SetupProfile />} />
-        
+
         {/* Protected Routes */}
-        <Route 
-          path="/dashboard" 
+        <Route
+          path="/dashboard"
           element={
             <ProtectedRoute>
               <Dashboard />
             </ProtectedRoute>
-          } 
+          }
         />
 
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
       </Route>
+
+      {/* Admin Routes (no Layout wrapper - AdminLayout is self-contained) */}
+      <Route path="/admin" element={<AdminDashboard />} />
+      <Route path="/admin/members" element={<Members />} />
+      <Route path="/admin/classes" element={<Classes />} />
+      <Route path="/admin/schedule" element={<Schedule />} />
+      <Route path="/admin/bookings" element={<Bookings />} />
+      <Route path="/admin/inquiries" element={<Inquiries />} />
+      <Route path="/admin/memberships" element={<Memberships />} />
+      <Route path="/admin/instructors" element={<Instructors />} />
+      <Route path="/admin/analytics" element={<Analytics />} />
+      <Route path="/admin/settings" element={<Settings />} />
     </Routes>
   );
 };

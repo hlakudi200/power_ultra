@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Phone, MapPin, Clock } from "lucide-react";
+import { Mail, Phone, MapPin, Clock, Loader2 } from "lucide-react";
 import ContactMap from "./ContactMap";
 
 const contactSchema = z.object({
@@ -53,7 +53,7 @@ const Contact = () => {
 
   const onSubmit = async (data: ContactFormData) => {
     setIsSubmitting(true);
-    
+
     try {
       const { error } = await supabase.from("contact_submissions").insert({
         name: data.name,
@@ -62,19 +62,28 @@ const Contact = () => {
       });
 
       if (error) {
-        throw new Error("Failed to send message: " + error.message);
+        console.error("Contact form submission error:", error);
+
+        // Handle specific validation errors
+        if (error.message.includes('valid_email')) {
+          throw new Error("Please enter a valid email address.");
+        }
+
+        throw new Error(error.message);
       }
 
       toast({
-        title: "Message Sent!",
-        description: "We'll get back to you within 24 hours.",
+        title: "Message Sent Successfully!",
+        description: "Thank you for contacting us. We'll get back to you within 24 hours.",
       });
 
       reset();
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Form submission error:", error);
+
       toast({
-        title: "Submission Error",
-        description: "There was a problem sending your message. Please try again.",
+        title: "Submission Failed",
+        description: error.message || "There was a problem sending your message. Please check your connection and try again.",
         variant: "destructive",
       });
     } finally {
@@ -165,7 +174,14 @@ const Contact = () => {
                 className="w-full bg-gradient-primary hover:shadow-glow font-bold"
                 size="lg"
               >
-                {isSubmitting ? "Sending..." : "SEND MESSAGE"}
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  "SEND MESSAGE"
+                )}
               </Button>
             </form>
           </div>

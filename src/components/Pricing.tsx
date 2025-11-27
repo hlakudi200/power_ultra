@@ -17,7 +17,11 @@ interface MembershipPlan {
 }
 
 const fetchMemberships = async () => {
-  const { data, error } = await supabase.from("memberships").select("*").order("price", { ascending: true });
+  const { data, error } = await supabase
+    .from("memberships")
+    .select("*")
+    .eq("is_active", true)  // Only fetch active memberships
+    .order("price", { ascending: true });
   if (error) {
     throw new Error("Failed to fetch memberships: " + error.message);
   }

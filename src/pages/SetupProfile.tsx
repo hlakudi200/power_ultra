@@ -29,27 +29,58 @@ const SetupProfile = () => {
         return;
     }
 
-    const { error } = await supabase.auth.updateUser({
-      data: {
-        first_name: firstName,
-        last_name: lastName,
-        phone: phone,
-      },
-    });
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
 
-    setIsLoading(false);
-    if (error) {
-      toast({
-        title: "Update Failed",
-        description: error.message,
-        variant: "destructive",
+      if (!user) {
+        throw new Error("No user found");
+      }
+
+      // Update auth.users metadata
+      const { error: authError } = await supabase.auth.updateUser({
+        data: {
+          first_name: firstName,
+          last_name: lastName,
+          phone: phone,
+        },
       });
-    } else {
+
+      if (authError) throw authError;
+
+      // Construct full_name from first_name and last_name
+      const fullName = `${firstName} ${lastName}`.trim();
+
+      // Also update profiles table (upsert to handle if it doesn't exist)
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .upsert({
+          id: user.id,
+          email: user.email,
+          first_name: firstName,
+          last_name: lastName,
+          full_name: fullName,
+          phone: phone || null,
+        }, {
+          onConflict: 'id'
+        });
+
+      if (profileError) throw profileError;
+
       toast({
         title: "Profile Updated!",
         description: "Welcome to Power Ultra Gym!",
       });
       navigate("/");
+    } catch (error: any) {
+      console.error("Profile update error:", error);
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update profile. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
