@@ -158,37 +158,45 @@ const Navigation = () => {
               </SheetTrigger>
               <SheetContent
                 side="right"
-                className="bg-background border-l border-border"
+                className="bg-background border-l border-border p-0"
               >
-                <div className="flex flex-col gap-6 mt-8">
-                  <div className="flex items-center gap-2 text-2xl font-black tracking-tight mb-4">
-                    <Dumbbell className="w-8 h-8 text-primary" />
-                    <span className="text-foreground">
-                      POWER <span className="text-primary">ULTRA</span>
-                    </span>
+                <div className="flex h-full flex-col">
+                  <div className="border-b border-border p-6">
+                    <div className="flex items-center gap-2 text-2xl font-black tracking-tight">
+                      <Dumbbell className="h-8 w-8 text-primary" />
+                      <span className="text-foreground">
+                        POWER <span className="text-primary">ULTRA</span>
+                      </span>
+                    </div>
                   </div>
-                  {navLinks.map((link) => (
-                    <button
-                      key={link.name}
-                      onClick={() => scrollToSection(link.href)}
-                      className="text-left text-lg font-semibold text-foreground hover:text-primary transition-colors duration-300 py-2"
-                    >
-                      {link.name}
-                    </button>
-                  ))}
-                  {session && ( // Conditionally render Dashboard link for authenticated users in mobile
-                    <button
-                      key="Dashboard"
-                      onClick={() => {
-                        navigate("/dashboard");
-                        setIsMobileMenuOpen(false); // Close mobile menu after navigation
-                      }}
-                      className="text-left text-lg font-semibold text-foreground hover:text-primary transition-colors duration-300 py-2"
-                    >
-                      Dashboard
-                    </button>
-                  )}
-                  <div className="mt-4">
+
+                  <div className="flex-1 overflow-y-auto p-6">
+                    <div className="flex flex-col gap-4">
+                      {navLinks.map((link) => (
+                        <button
+                          key={link.name}
+                          onClick={() => scrollToSection(link.href)}
+                          className="text-left text-lg font-semibold text-foreground transition-colors duration-300 hover:text-primary py-2"
+                        >
+                          {link.name}
+                        </button>
+                      ))}
+                      {session && (
+                        <button
+                          key="Dashboard"
+                          onClick={() => {
+                            navigate("/dashboard");
+                            setIsMobileMenuOpen(false);
+                          }}
+                          className="text-left text-lg font-semibold text-foreground transition-colors duration-300 hover:text-primary py-2"
+                        >
+                          Dashboard
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-auto border-t border-border p-6">
                     <AuthButton />
                   </div>
                 </div>
