@@ -158,7 +158,7 @@ const Navigation = () => {
               </SheetTrigger>
               <SheetContent
                 side="right"
-                className="w-[300px] bg-background border-l border-border"
+                className="bg-background border-l border-border"
               >
                 <div className="flex flex-col gap-6 mt-8">
                   <div className="flex items-center gap-2 text-2xl font-black tracking-tight mb-4">
