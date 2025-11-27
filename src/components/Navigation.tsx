@@ -171,7 +171,7 @@ const Navigation = () => {
                     <button
                       key={link.name}
                       onClick={() => scrollToSection(link.href)}
-                      className="text-left text-xl font-semibold text-foreground hover:text-primary transition-colors duration-300 py-2"
+                      className="text-left text-lg font-semibold text-foreground hover:text-primary transition-colors duration-300 py-2"
                     >
                       {link.name}
                     </button>
@@ -183,7 +183,7 @@ const Navigation = () => {
                         navigate("/dashboard");
                         setIsMobileMenuOpen(false); // Close mobile menu after navigation
                       }}
-                      className="text-left text-xl font-semibold text-foreground hover:text-primary transition-colors duration-300 py-2"
+                      className="text-left text-lg font-semibold text-foreground hover:text-primary transition-colors duration-300 py-2"
                     >
                       Dashboard
                     </button>
