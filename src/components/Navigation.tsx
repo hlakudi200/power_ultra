@@ -74,7 +74,7 @@ const Navigation = () => {
       : session.user.email;
 
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <NotificationBell />
         <span className="text-sm font-medium text-foreground hidden sm:inline truncate" title={displayName}>
           {displayName}
