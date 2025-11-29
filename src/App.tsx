@@ -29,19 +29,24 @@ import { supabase } from "@/lib/supabaseClient"; // Keep supabase for ProtectedR
 
 const queryClient = new QueryClient();
 
-// Protected Route Wrapper
+// Protected Route Wrapper with Role-Based Routing
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   const { session, loading } = useSession();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
 
   const [isMembershipChecked, setIsMembershipChecked] = useState(false);
   const [hasActiveMembership, setHasActiveMembership] = useState(false);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
+  const [userRole, setUserRole] = useState<{
+    isAdmin: boolean;
+    isTrainer: boolean;
+  } | null>(null);
 
-  // Effect 1: Check authentication status and fetch profile
+  // Effect 1: Check authentication status, fetch profile, and determine role
   useEffect(() => {
-    const checkMembership = async () => {
+    const checkMembershipAndRole = async () => {
       if (!loading && !session) {
         // Not authenticated
         navigate("/");
@@ -55,18 +60,34 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
 
       if (session && !isMembershipChecked) {
         setIsProfileLoading(true);
+
+        // Fetch user profile
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("membership_expiry_date, is_admin")
+          .select("membership_expiry_date, is_admin, role")
           .eq("id", session.user.id)
           .single();
 
         if (profileError) {
           console.error("Error fetching profile for membership check:", profileError);
-          setHasActiveMembership(false); // Assume no active membership on error
+          setHasActiveMembership(false);
+          setUserRole({ isAdmin: false, isTrainer: false });
         } else {
+          // Check if user is a trainer
+          const { data: trainerData } = await supabase
+            .from("instructors")
+            .select("id, is_personal_trainer")
+            .eq("user_id", session.user.id)
+            .eq("is_personal_trainer", true)
+            .maybeSingle();
+
+          const isTrainer = !!trainerData;
+          const isAdmin = profile?.is_admin || false;
+
+          setUserRole({ isAdmin, isTrainer });
+
           // Admins don't need active membership
-          if (profile?.is_admin) {
+          if (isAdmin) {
             setHasActiveMembership(true);
           } else {
             const expiryDate = profile?.membership_expiry_date ? new Date(profile.membership_expiry_date) : null;
@@ -78,26 +99,43 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
       }
     };
 
-    checkMembership();
+    checkMembershipAndRole();
   }, [session, loading, navigate, isMembershipChecked, toast]);
 
-  // Effect 2: Handle redirection based on membership status
+  // Effect 2: Handle role-based redirection
   useEffect(() => {
-    if (isMembershipChecked && !hasActiveMembership && !isProfileLoading) {
-      navigate("/"); // Redirect if no active membership
-      toast({
-        title: "Access Denied",
-        description: "An active membership is required to access the dashboard.",
-        variant: "destructive",
-      });
+    if (isMembershipChecked && !isProfileLoading && userRole) {
+      const currentPath = location.pathname;
+
+      // Admin auto-redirect to /admin from /dashboard or /trainer-dashboard
+      if (userRole.isAdmin && (currentPath === "/dashboard" || currentPath === "/trainer-dashboard")) {
+        navigate("/admin");
+        return;
+      }
+
+      // Trainer auto-redirect to /trainer-dashboard from /dashboard (if not admin)
+      if (userRole.isTrainer && !userRole.isAdmin && currentPath === "/dashboard") {
+        navigate("/trainer-dashboard");
+        return;
+      }
+
+      // Check membership for non-admin, non-trainer users trying to access dashboard
+      if (!userRole.isAdmin && !userRole.isTrainer && !hasActiveMembership && currentPath === "/dashboard") {
+        navigate("/");
+        toast({
+          title: "Access Denied",
+          description: "An active membership is required to access the dashboard.",
+          variant: "destructive",
+        });
+      }
     }
-  }, [isMembershipChecked, hasActiveMembership, isProfileLoading, navigate, toast]);
+  }, [isMembershipChecked, hasActiveMembership, isProfileLoading, userRole, location.pathname, navigate, toast]);
 
   if (loading || isProfileLoading || !isMembershipChecked) {
     return <div className="min-h-screen flex items-center justify-center bg-background text-foreground">Loading user permissions...</div>;
   }
 
-  return session && hasActiveMembership ? children : null; // Render children if authenticated AND has active membership
+  return session && (hasActiveMembership || userRole?.isAdmin || userRole?.isTrainer) ? children : null;
 };
 
 // This component handles the redirection logic for new users and all app routes
