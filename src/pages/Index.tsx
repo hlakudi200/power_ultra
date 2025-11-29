@@ -19,7 +19,8 @@ const Index = () => {
 
   // Effect to scroll to hash on load or hash change
   useEffect(() => {
-    if (location.hash) {
+    // Only handle navigation hashes (like #features), not OAuth callback hashes
+    if (location.hash && !location.hash.includes('access_token') && !location.hash.includes('error')) {
       const element = document.querySelector(location.hash);
       if (element) {
         element.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -36,6 +37,10 @@ const Index = () => {
         setIsCheckingRole(true);
 
         try {
+          // Small delay to ensure profile creation completes for new Google users
+          // This handles the race condition where OAuth creates session before profile
+          await new Promise(resolve => setTimeout(resolve, 500));
+
           // Check if user is admin
           const { data: profile, error: profileError } = await supabase
             .from("profiles")
@@ -51,7 +56,7 @@ const Index = () => {
 
           // Admins go to admin dashboard
           if (profile?.is_admin) {
-            navigate("/admin");
+            navigate("/admin", { replace: true });
             return;
           }
 
@@ -69,12 +74,12 @@ const Index = () => {
 
           // Trainers go to trainer dashboard
           if (trainerData) {
-            navigate("/trainer-dashboard");
+            navigate("/trainer-dashboard", { replace: true });
             return;
           }
 
           // Regular members go to member dashboard
-          navigate("/dashboard");
+          navigate("/dashboard", { replace: true });
         } catch (error) {
           console.error("Error in role check:", error);
         } finally {
@@ -87,6 +92,18 @@ const Index = () => {
 
     checkAndRedirect();
   }, [session, loading, navigate]);
+
+  // Show loading state while checking role and redirecting
+  if (session && isCheckingRole) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Redirecting to your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-background">

@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ClassCard from "@/components/ClassCard";
 import BookingDialog from "@/components/BookingDialog";
 import { MyTrainer } from "@/components/MyTrainer";
+import { UserAvatar } from "@/components/UserAvatar";
 import { ScheduledClass } from "@/types/supabase";
 import { useState } from "react";
 
@@ -21,7 +22,7 @@ import { useState } from "react";
 const fetchUserProfile = async (userId: string) => {
   const { data, error } = await supabase
     .from("profiles")
-    .select("first_name, last_name, email, phone, membership_expiry_date, memberships(name)")
+    .select("first_name, last_name, email, phone, membership_expiry_date, avatar_url, memberships(name)")
     .eq("id", userId)
     .single();
   if (error) {
@@ -457,8 +458,13 @@ const Dashboard = () => {
                 <CardDescription className="text-muted-foreground">Manage your personal details and membership.</CardDescription>
               </CardHeader>
               <CardContent className="pt-6 space-y-4 text-foreground">
-                <p><strong>Name:</strong> {profile?.first_name} {profile?.last_name}</p>
-                <p><strong>Email:</strong> {profile?.email}</p>
+                <div className="flex items-center gap-4 mb-4">
+                  <UserAvatar user={session?.user || null} profile={profile} size="xl" />
+                  <div>
+                    <p className="text-lg font-semibold">{profile?.first_name} {profile?.last_name}</p>
+                    <p className="text-sm text-muted-foreground">{profile?.email}</p>
+                  </div>
+                </div>
                 <p><strong>Phone:</strong> {profile?.phone || "Not provided"}</p>
               </CardContent>
             </Card>
