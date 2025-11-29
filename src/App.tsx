@@ -6,6 +6,8 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import SetupProfile from "./pages/SetupProfile";
 import Dashboard from "./pages/Dashboard";
+import WorkoutPlanPage from "./pages/WorkoutPlanPage";
+import TrainerDashboard from "./pages/TrainerDashboard";
 import Layout from "./components/Layout"; // Import the Layout component
 
 // Admin imports
@@ -128,6 +130,22 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/workout-plan"
+          element={
+            <ProtectedRoute>
+              <WorkoutPlanPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/trainer-dashboard"
+          element={
+            <ProtectedRoute>
+              <TrainerDashboard />
             </ProtectedRoute>
           }
         />

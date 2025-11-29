@@ -28,8 +28,9 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
-import { Search, UserPlus, Edit, Trash2, Calendar } from "lucide-react";
+import { Search, UserPlus, Edit, Trash2, Calendar, Users } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { AssignTrainerDialog } from "@/components/admin/AssignTrainerDialog";
 
 interface Member {
   id: string;
@@ -50,6 +51,8 @@ export default function Members() {
   const [filterRole, setFilterRole] = useState<string>("all");
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [assignTrainerOpen, setAssignTrainerOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<{ id: string; name: string } | null>(null);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -219,6 +222,18 @@ export default function Members() {
     }
   };
 
+  const handleAssignTrainer = (member: Member) => {
+    setSelectedMember({
+      id: member.id,
+      name: `${member.first_name} ${member.last_name}`,
+    });
+    setAssignTrainerOpen(true);
+  };
+
+  const handleAssignSuccess = () => {
+    fetchMembers();
+  };
+
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -342,6 +357,16 @@ export default function Members() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
+                          {!member.is_admin && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleAssignTrainer(member)}
+                              title="Assign trainer"
+                            >
+                              <Users className="h-4 w-4" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -458,6 +483,17 @@ export default function Members() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Assign Trainer Dialog */}
+        {selectedMember && (
+          <AssignTrainerDialog
+            open={assignTrainerOpen}
+            onOpenChange={setAssignTrainerOpen}
+            memberId={selectedMember.id}
+            memberName={selectedMember.name}
+            onSuccess={handleAssignSuccess}
+          />
+        )}
       </div>
     </AdminLayout>
   );

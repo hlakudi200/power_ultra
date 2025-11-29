@@ -47,13 +47,10 @@ CREATE TABLE public.classes (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   name text NOT NULL,
   description text,
-  instructor text,
   image_url text,
-  instructor_id uuid,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT classes_pkey PRIMARY KEY (id),
-  CONSTRAINT classes_instructor_id_fkey FOREIGN KEY (instructor_id) REFERENCES public.instructors(id)
+  CONSTRAINT classes_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.contact_submissions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -129,6 +126,18 @@ CREATE TABLE public.memberships (
   is_active boolean DEFAULT true,
   CONSTRAINT memberships_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.notifications (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  type text NOT NULL CHECK (type = ANY (ARRAY['class_cancelled'::text, 'class_rescheduled'::text, 'booking_confirmed'::text, 'membership_expiring'::text, 'general'::text])),
+  title text NOT NULL,
+  message text NOT NULL,
+  related_id uuid,
+  is_read boolean DEFAULT false,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT notifications_pkey PRIMARY KEY (id),
+  CONSTRAINT notifications_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
+);
 CREATE TABLE public.profiles (
   id uuid NOT NULL,
   full_name text,
@@ -158,7 +167,9 @@ CREATE TABLE public.schedule (
   cancellation_reason text,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
+  instructor_id uuid,
   CONSTRAINT schedule_pkey PRIMARY KEY (id),
   CONSTRAINT schedule_class_id_fkey FOREIGN KEY (class_id) REFERENCES public.classes(id),
-  CONSTRAINT schedule_cancelled_by_fkey FOREIGN KEY (cancelled_by) REFERENCES public.profiles(id)
+  CONSTRAINT schedule_cancelled_by_fkey FOREIGN KEY (cancelled_by) REFERENCES public.profiles(id),
+  CONSTRAINT schedule_instructor_id_fkey FOREIGN KEY (instructor_id) REFERENCES public.instructors(id)
 );

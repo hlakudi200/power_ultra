@@ -107,6 +107,19 @@ const BookingDialog = ({
         description: `You've been booked for ${className} at ${classTime}.`,
       });
 
+      // Update waitlist status if user was on waitlist
+      try {
+        await supabase
+          .from("waitlist")
+          .update({ status: "converted" })
+          .eq("schedule_id", scheduleId)
+          .eq("user_id", session.user.id)
+          .in("status", ["waiting", "notified"]);
+      } catch (waitlistError) {
+        console.error("Error updating waitlist status:", waitlistError);
+        // Don't show error to user - booking was successful
+      }
+
       // Non-blocking call to send confirmation email
       try {
         const { error: invokeError } = await supabase.functions.invoke("send-booking-confirmation", {

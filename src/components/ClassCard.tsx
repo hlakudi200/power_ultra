@@ -1,6 +1,7 @@
 import { Clock, Users, Flame } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { WaitlistButton } from "./WaitlistButton";
 
 interface ClassCardProps {
   name?: string;
@@ -15,6 +16,9 @@ interface ClassCardProps {
   isFull?: boolean;
   bookingCount?: number;
   maxCapacity?: number;
+  scheduleId?: string;
+  dayOfWeek?: string;
+  onWaitlistChange?: () => void;
 }
 
 const intensityColors: { [key: string]: string } = {
@@ -42,6 +46,9 @@ const ClassCard = ({
   isFull = false,
   bookingCount,
   maxCapacity,
+  scheduleId,
+  dayOfWeek,
+  onWaitlistChange,
 }: ClassCardProps) => {
   const capacityDisplay = bookingCount !== undefined && maxCapacity !== undefined
     ? `${bookingCount}/${maxCapacity}`
@@ -102,13 +109,27 @@ const ClassCard = ({
         <span className="font-semibold">{duration}</span>
       </div>
 
-      <Button
-        onClick={onBook}
-        disabled={isFull}
-        className="w-full bg-gradient-primary text-primary-foreground hover:shadow-glow font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {isFull ? "CLASS FULL" : "BOOK NOW"}
-      </Button>
+      <div className="space-y-2">
+        <Button
+          onClick={onBook}
+          disabled={isFull}
+          className="w-full bg-gradient-primary text-primary-foreground hover:shadow-glow font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isFull ? "CLASS FULL" : "BOOK NOW"}
+        </Button>
+
+        {/* Waitlist button - shows when class is full or user is on waitlist */}
+        {scheduleId && dayOfWeek && (
+          <WaitlistButton
+            scheduleId={scheduleId}
+            className={name}
+            classTime={time}
+            dayOfWeek={dayOfWeek}
+            isFull={isFull}
+            onWaitlistChange={onWaitlistChange}
+          />
+        )}
+      </div>
     </div>
   );
 };

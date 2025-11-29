@@ -12,6 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ClassCard from "@/components/ClassCard";
 import BookingDialog from "@/components/BookingDialog";
+import { MyTrainer } from "@/components/MyTrainer";
 import { ScheduledClass } from "@/types/supabase";
 import { useState } from "react";
 
@@ -26,6 +27,15 @@ const fetchUserProfile = async (userId: string) => {
   if (error) {
     throw new Error(error.message);
   }
+
+  // Transform memberships array to single object
+  if (data && data.memberships) {
+    return {
+      ...data,
+      memberships: Array.isArray(data.memberships) ? data.memberships[0] : data.memberships,
+    };
+  }
+
   return data;
 };
 
@@ -100,25 +110,33 @@ const fetchUserBookings = async (userId: string) => {
     throw new Error(error.message);
   }
 
-  // Add next occurrence date to each booking and sort by it
-  const bookingsWithDates = data.map(booking => {
+  // Transform schedule arrays to single objects and add next occurrence date
+  const bookingsWithDates = data.map((booking: any) => {
     if (!booking.schedule) return null;
+
+    // Transform nested arrays to single objects
+    const transformedSchedule = {
+      ...booking.schedule,
+      classes: Array.isArray(booking.schedule.classes) ? booking.schedule.classes[0] : booking.schedule.classes,
+      instructors: Array.isArray(booking.schedule.instructors) ? booking.schedule.instructors[0] : booking.schedule.instructors,
+    };
 
     try {
       const nextOccurrence = getNextClassOccurrence(
-        booking.schedule.day_of_week,
-        booking.schedule.start_time
+        transformedSchedule.day_of_week,
+        transformedSchedule.start_time
       );
 
       return {
         ...booking,
+        schedule: transformedSchedule,
         nextOccurrence,
       };
     } catch (err) {
       console.error('Error calculating next occurrence:', err);
       return null;
     }
-  }).filter(Boolean) as Array<typeof data[0] & { nextOccurrence: Date }>;
+  }).filter(Boolean) as Array<any>;
 
   // Sort by next occurrence (soonest first)
   bookingsWithDates.sort((a, b) =>
@@ -144,7 +162,8 @@ const fetchSchedule = async () => {
       classes (
         id,
         name,
-        description
+        description,
+        image_url
       ),
       instructors (
         name
@@ -160,15 +179,18 @@ const fetchSchedule = async () => {
   // Fetch booking counts for each schedule
   if (data && data.length > 0) {
     const scheduleWithBookings = await Promise.all(
-      data.map(async (schedule) => {
+      data.map(async (schedule: any) => {
         const { count } = await supabase
           .from("bookings")
           .select("*", { count: "exact", head: true })
           .eq("schedule_id", schedule.id)
           .in("status", ["confirmed", "pending"]);
 
+        // Transform arrays to single objects for type compatibility
         return {
           ...schedule,
+          classes: Array.isArray(schedule.classes) ? schedule.classes[0] : schedule.classes,
+          instructors: Array.isArray(schedule.instructors) ? schedule.instructors[0] : schedule.instructors,
           booking_count: count || 0,
         };
       })
@@ -177,7 +199,7 @@ const fetchSchedule = async () => {
     return scheduleWithBookings as ScheduledClass[];
   }
 
-  return data as ScheduledClass[];
+  return [];
 };
 
 const days = [
@@ -276,6 +298,29 @@ const Dashboard = () => {
     }
 
     try {
+      // First, get the booking details before cancelling
+      const { data: bookingData, error: fetchError } = await supabase
+        .from("bookings")
+        .select(`
+          id,
+          schedule_id,
+          schedule (
+            id,
+            day_of_week,
+            start_time,
+            end_time,
+            classes (name)
+          )
+        `)
+        .eq("id", bookingId)
+        .single();
+
+      if (fetchError) {
+        console.error("Error fetching booking:", fetchError);
+        throw new Error(fetchError.message);
+      }
+
+      // Cancel the booking
       const { error } = await supabase
         .from("bookings")
         .update({ status: "cancelled" })
@@ -290,6 +335,43 @@ const Dashboard = () => {
         title: "Booking Cancelled Successfully",
         description: "Your class booking has been cancelled. The spot is now available for others.",
       });
+
+      // Process waitlist if booking was cancelled successfully
+      if (bookingData && session?.access_token) {
+        try {
+          const scheduleData = Array.isArray(bookingData.schedule)
+            ? bookingData.schedule[0]
+            : bookingData.schedule;
+
+          const classData = Array.isArray(scheduleData?.classes)
+            ? scheduleData.classes[0]
+            : scheduleData?.classes;
+
+          const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+          const response = await fetch(`${SUPABASE_URL}/functions/v1/process-waitlist`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              schedule_id: bookingData.schedule_id,
+              class_name: classData?.name || "Class",
+              day_of_week: scheduleData?.day_of_week || "Unknown",
+              start_time: scheduleData?.start_time || "00:00",
+              end_time: scheduleData?.end_time || "00:00",
+            }),
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            console.log(`Waitlist processed: ${result.notified_count} member(s) notified`);
+          }
+        } catch (waitlistError) {
+          // Don't show error to user, just log it
+          console.error("Error processing waitlist:", waitlistError);
+        }
+      }
 
       refetchBookings(); // Refresh bookings list
     } catch (error: any) {
@@ -329,7 +411,9 @@ const Dashboard = () => {
         return (
           <p className="text-sm">
             <span className="text-green-400 font-semibold">Active</span> until {format(expiryDate, "PPP")}
-            <span className="block text-xs text-muted-foreground mt-1">({profile.memberships?.name})</span>
+            {profile.memberships && !Array.isArray(profile.memberships) && (
+              <span className="block text-xs text-muted-foreground mt-1">({profile.memberships.name})</span>
+            )}
           </p>
         );
       } else {
@@ -393,6 +477,9 @@ const Dashboard = () => {
                 </Button>
               </CardContent>
             </Card>
+
+            {/* My Trainer Widget */}
+            <MyTrainer />
           </div>
 
           {/* Main Content - Upcoming Classes */}
@@ -520,6 +607,9 @@ const Dashboard = () => {
                                       capacity={`${c.max_capacity} spots`}
                                       intensity="Medium"
                                       color="primary"
+                                      scheduleId={c.id}
+                                      dayOfWeek={c.day_of_week}
+                                      onWaitlistChange={fetchSchedule}
                                     />
                                   )
                               )}

@@ -41,15 +41,18 @@ const fetchSchedule = async () => {
   // Fetch booking counts for each schedule
   if (data && data.length > 0) {
     const scheduleWithBookings = await Promise.all(
-      data.map(async (schedule) => {
+      data.map(async (schedule: any) => {
         const { count } = await supabase
           .from("bookings")
           .select("*", { count: "exact", head: true })
           .eq("schedule_id", schedule.id)
           .in("status", ["confirmed", "pending"]);
 
+        // Transform arrays to single objects for type compatibility
         return {
           ...schedule,
+          classes: Array.isArray(schedule.classes) ? schedule.classes[0] : schedule.classes,
+          instructors: Array.isArray(schedule.instructors) ? schedule.instructors[0] : schedule.instructors,
           booking_count: count || 0,
         };
       })
@@ -58,7 +61,7 @@ const fetchSchedule = async () => {
     return scheduleWithBookings as ScheduledClass[];
   }
 
-  return data as ScheduledClass[];
+  return [];
 };
 
 const days = [
@@ -95,7 +98,7 @@ const Schedule = () => {
     scheduleId: string;
   } | null>(null);
 
-  const { data: schedule, isLoading, error } = useQuery({
+  const { data: schedule, isLoading, error, refetch } = useQuery({
     queryKey: ["schedule"],
     queryFn: fetchSchedule,
   });
@@ -266,11 +269,13 @@ const Schedule = () => {
                                 c.id
                               )
                             }
-                            // Props that are no longer available in the new data structure can be removed or given defaults
-                            duration="60 min" // Example default
-                            capacity={`${c.max_capacity} spots`} // Example from new data
-                            intensity="Medium" // Example default
-                            color="primary" // Example default
+                            duration="60 min"
+                            capacity={`${c.max_capacity} spots`}
+                            intensity="Medium"
+                            color="primary"
+                            scheduleId={c.id}
+                            dayOfWeek={c.day_of_week}
+                            onWaitlistChange={() => refetch()}
                           />
                         )
                     )}

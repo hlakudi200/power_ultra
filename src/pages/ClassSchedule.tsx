@@ -58,9 +58,13 @@ export default function ClassSchedule() {
         classes (
           name,
           description,
-          instructor
+          image_url
+        ),
+        instructors (
+          name
         )
       `)
+      .eq("is_cancelled", false)
       .order("day_of_week", { ascending: true })
       .order("start_time", { ascending: true });
 
@@ -78,7 +82,7 @@ export default function ClassSchedule() {
     // Fetch booking counts and user's bookings for each schedule item
     if (scheduleData && scheduleData.length > 0) {
       const scheduleWithBookings = await Promise.all(
-        scheduleData.map(async (schedule) => {
+        scheduleData.map(async (schedule: any) => {
           // Get booking count
           const { count } = await supabase
             .from("bookings")
@@ -95,8 +99,11 @@ export default function ClassSchedule() {
             .in("status", ["confirmed", "pending"])
             .single();
 
+          // Transform arrays to single objects for type compatibility
           return {
             ...schedule,
+            classes: Array.isArray(schedule.classes) ? schedule.classes[0] : schedule.classes,
+            instructors: Array.isArray(schedule.instructors) ? schedule.instructors[0] : schedule.instructors,
             booking_count: count || 0,
             user_booked: !!userBooking,
             user_booking_id: userBooking?.id,
