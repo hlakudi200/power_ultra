@@ -82,7 +82,7 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
             .maybeSingle();
 
           const isTrainer = !!trainerData;
-          const isAdmin = profile?.role === "admin";
+          const isAdmin = profile?.is_admin === true;
 
           setUserRole({ isAdmin, isTrainer });
 

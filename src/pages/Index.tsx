@@ -14,7 +14,7 @@ import Footer from "@/components/Footer";
 const Index = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { session, loading } = useSession();
+  const { session, loading, isNewLogin } = useSession();
   const [isCheckingRole, setIsCheckingRole] = useState(false);
 
   // Effect to scroll to hash on load or hash change
@@ -28,38 +28,56 @@ const Index = () => {
     }
   }, [location.hash]);
 
-  // Effect to redirect ONLY admins and trainers after OAuth callback
+  // Effect to redirect ONLY admins and trainers after login
   // Regular members can browse public pages freely
   useEffect(() => {
     const checkAndRedirect = async () => {
       if (loading) return;
 
-      // Only redirect if coming from OAuth (has hash with tokens)
-      const hasOAuthCallback = location.hash && location.hash.includes('access_token');
-
-      if (session && hasOAuthCallback) {
+      // Only redirect if this is a new login (not a page reload with existing session)
+      if (session && isNewLogin) {
         setIsCheckingRole(true);
 
         try {
-          // Small delay to ensure profile creation completes for new Google users
-          // This handles the race condition where OAuth creates session before profile
-          await new Promise(resolve => setTimeout(resolve, 500));
+          // Poll for profile with retries to handle new Google user profile creation
+          let profile = null;
+          let retries = 0;
+          const maxRetries = 5;
 
-          // Check if user is admin
-          const { data: profile, error: profileError } = await supabase
-            .from("profiles")
-            .select("is_admin")
-            .eq("id", session.user.id)
-            .single();
+          while (!profile && retries < maxRetries) {
+            const { data, error } = await supabase
+              .from("profiles")
+              .select("is_admin")
+              .eq("id", session.user.id)
+              .maybeSingle();
 
-          if (profileError) {
-            console.error("Error fetching profile:", profileError);
+            if (data) {
+              profile = data;
+              break;
+            }
+
+            if (error && !error.message.includes('not found')) {
+              console.error("Error fetching profile:", error);
+              break;
+            }
+
+            // Profile doesn't exist yet, wait and retry
+            await new Promise(resolve => setTimeout(resolve, 200));
+            retries++;
+          }
+
+          if (!profile) {
+            console.error("Profile not found after", retries, "retries");
             setIsCheckingRole(false);
             return;
           }
 
           // Admins go to admin dashboard automatically
-          if (profile?.is_admin) {
+          if (profile.is_admin === true) {
+            // Clean up OAuth hash before redirect
+            if (window.location.hash) {
+              window.history.replaceState(null, '', window.location.pathname);
+            }
             navigate("/admin", { replace: true });
             return;
           }
@@ -78,6 +96,10 @@ const Index = () => {
 
           // Trainers go to trainer dashboard automatically
           if (trainerData) {
+            // Clean up OAuth hash before redirect
+            if (window.location.hash) {
+              window.history.replaceState(null, '', window.location.pathname);
+            }
             navigate("/trainer-dashboard", { replace: true });
             return;
           }
@@ -85,6 +107,10 @@ const Index = () => {
           // Regular members: DO NOT auto-redirect
           // Let them browse public pages
           // They can use "Dashboard" button in navigation to go to dashboard manually
+          // Clean up OAuth hash for regular members too
+          if (window.location.hash) {
+            window.history.replaceState(null, '', window.location.pathname);
+          }
           setIsCheckingRole(false);
         } catch (error) {
           console.error("Error in role check:", error);
@@ -96,7 +122,7 @@ const Index = () => {
     };
 
     checkAndRedirect();
-  }, [session, loading, navigate, location.hash]);
+  }, [session, loading, isNewLogin, navigate]);
 
   // Show loading state while checking role and redirecting
   if (session && isCheckingRole) {
