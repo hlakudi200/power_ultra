@@ -15,7 +15,7 @@ const Index = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { session, loading } = useSession();
-  const [isCheckingRole, setIsCheckingRole] = useState(true);
+  const [isCheckingRole, setIsCheckingRole] = useState(false);
 
   // Effect to scroll to hash on load or hash change
   useEffect(() => {
@@ -28,12 +28,17 @@ const Index = () => {
     }
   }, [location.hash]);
 
-  // Effect to redirect logged-in users to their appropriate dashboard
+  // Effect to redirect logged-in users ONLY after OAuth callback
+  // This allows logged-in members to browse public pages while still
+  // redirecting them automatically after Google sign-in
   useEffect(() => {
     const checkAndRedirect = async () => {
       if (loading) return;
 
-      if (session) {
+      // Only redirect if coming from OAuth (has hash with tokens)
+      const hasOAuthCallback = location.hash && location.hash.includes('access_token');
+
+      if (session && hasOAuthCallback) {
         setIsCheckingRole(true);
 
         try {
@@ -91,7 +96,7 @@ const Index = () => {
     };
 
     checkAndRedirect();
-  }, [session, loading, navigate]);
+  }, [session, loading, navigate, location.hash]);
 
   // Show loading state while checking role and redirecting
   if (session && isCheckingRole) {

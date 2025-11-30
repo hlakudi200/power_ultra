@@ -66,19 +66,24 @@ export function MyTrainer() {
         .from("trainer_assignments")
         .select(`
           id,
-          workout_plans!inner (
-            id
+          workout_plans (
+            id,
+            status
           )
         `)
         .eq("member_id", session.user.id)
         .eq("status", "active")
-        .eq("workout_plans.status", "active")
-        .single();
+        .maybeSingle();
 
-      if (assignmentData?.workout_plans?.[0]?.id) {
-        const planId = Array.isArray(assignmentData.workout_plans)
-          ? assignmentData.workout_plans[0].id
-          : assignmentData.workout_plans.id;
+      // Filter for active workout plans
+      const activePlans = assignmentData?.workout_plans
+        ? (Array.isArray(assignmentData.workout_plans)
+            ? assignmentData.workout_plans.filter(plan => plan.status === 'active')
+            : (assignmentData.workout_plans.status === 'active' ? [assignmentData.workout_plans] : []))
+        : [];
+
+      if (activePlans.length > 0 && activePlans[0]?.id) {
+        const planId = activePlans[0].id;
 
         // Get completion stats
         const { data: statsData, error: statsError } = await supabase
