@@ -28,9 +28,8 @@ const Index = () => {
     }
   }, [location.hash]);
 
-  // Effect to redirect logged-in users ONLY after OAuth callback
-  // This allows logged-in members to browse public pages while still
-  // redirecting them automatically after Google sign-in
+  // Effect to redirect ONLY admins and trainers after OAuth callback
+  // Regular members can browse public pages freely
   useEffect(() => {
     const checkAndRedirect = async () => {
       if (loading) return;
@@ -59,7 +58,7 @@ const Index = () => {
             return;
           }
 
-          // Admins go to admin dashboard
+          // Admins go to admin dashboard automatically
           if (profile?.is_admin) {
             navigate("/admin", { replace: true });
             return;
@@ -77,17 +76,18 @@ const Index = () => {
             console.error("Error checking trainer status:", trainerError);
           }
 
-          // Trainers go to trainer dashboard
+          // Trainers go to trainer dashboard automatically
           if (trainerData) {
             navigate("/trainer-dashboard", { replace: true });
             return;
           }
 
-          // Regular members go to member dashboard
-          navigate("/dashboard", { replace: true });
+          // Regular members: DO NOT auto-redirect
+          // Let them browse public pages
+          // They can use "Dashboard" button in navigation to go to dashboard manually
+          setIsCheckingRole(false);
         } catch (error) {
           console.error("Error in role check:", error);
-        } finally {
           setIsCheckingRole(false);
         }
       } else {
