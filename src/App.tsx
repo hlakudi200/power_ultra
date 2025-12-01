@@ -8,6 +8,7 @@ import SetupProfile from "./pages/SetupProfile";
 import Dashboard from "./pages/Dashboard";
 import WorkoutPlanPage from "./pages/WorkoutPlanPage";
 import TrainerDashboard from "./pages/TrainerDashboard";
+import ClientDetailView from "./pages/trainer/ClientDetailView";
 import Layout from "./components/Layout"; // Import the Layout component
 
 // Admin imports
@@ -184,6 +185,14 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute>
               <TrainerDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/trainer-dashboard/client/:assignmentId"
+          element={
+            <ProtectedRoute>
+              <ClientDetailView />
             </ProtectedRoute>
           }
         />

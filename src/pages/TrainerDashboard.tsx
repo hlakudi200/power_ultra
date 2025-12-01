@@ -17,11 +17,18 @@ interface TrainerInfo {
   is_personal_trainer: boolean;
 }
 
+interface TrainerStats {
+  total_active_clients: number;
+  total_active_plans: number;
+  avg_compliance_percentage: number;
+  total_workouts_this_week: number;
+}
+
 const TrainerDashboard = () => {
   const { session } = useSession();
   const navigate = useNavigate();
   const [trainer, setTrainer] = useState<TrainerInfo | null>(null);
-  const [clientCount, setClientCount] = useState(0);
+  const [stats, setStats] = useState<TrainerStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [createPlanOpen, setCreatePlanOpen] = useState(false);
@@ -60,13 +67,16 @@ const TrainerDashboard = () => {
 
       setTrainer(trainerData);
 
-      // Get client count
-      const count = await supabase.rpc("get_trainer_client_count", {
-        p_trainer_id: trainerData.id,
-      });
+      // Get dashboard statistics
+      const { data: statsData, error: statsError } = await supabase.rpc(
+        "get_trainer_dashboard_stats",
+        { p_trainer_id: trainerData.id }
+      );
 
-      if (!count.error) {
-        setClientCount(count.data || 0);
+      if (statsError) {
+        console.error("Error fetching trainer stats:", statsError);
+      } else if (statsData && statsData.length > 0) {
+        setStats(statsData[0]);
       }
     } catch (err: any) {
       console.error("Error fetching trainer info:", err);
@@ -84,7 +94,8 @@ const TrainerDashboard = () => {
   const handlePlanCreated = () => {
     setCreatePlanOpen(false);
     setSelectedClientId(null);
-    // Refresh client list
+    // Refresh trainer info to update stats
+    fetchTrainerInfo();
   };
 
   if (isLoading) {
@@ -120,6 +131,7 @@ const TrainerDashboard = () => {
     );
   }
 
+  const clientCount = stats?.total_active_clients || 0;
   const capacityPercentage = Math.round((clientCount / trainer.max_clients) * 100);
   const isNearCapacity = capacityPercentage >= 80;
   const isAtCapacity = clientCount >= trainer.max_clients;
@@ -185,7 +197,9 @@ const TrainerDashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-black text-primary mb-2">--</div>
+              <div className="text-4xl font-black text-primary mb-2">
+                {stats?.total_active_plans || 0}
+              </div>
               <p className="text-sm text-muted-foreground">
                 Workout plans in progress
               </p>
@@ -201,9 +215,11 @@ const TrainerDashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-black text-primary mb-2">--</div>
+              <div className="text-4xl font-black text-primary mb-2">
+                {stats?.avg_compliance_percentage?.toFixed(1) || "0"}%
+              </div>
               <p className="text-sm text-muted-foreground">
-                Client workout completion
+                Client workout completion (7 days)
               </p>
             </CardContent>
           </Card>

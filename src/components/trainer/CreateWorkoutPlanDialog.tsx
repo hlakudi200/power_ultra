@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -32,8 +32,10 @@ interface CreateWorkoutPlanDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   trainerId: string;
-  clientId: string;
+  clientId?: string; // Made optional for edit mode
   onSuccess: () => void;
+  mode?: "create" | "edit";
+  planId?: string;
 }
 
 export function CreateWorkoutPlanDialog({
@@ -42,6 +44,8 @@ export function CreateWorkoutPlanDialog({
   trainerId,
   clientId,
   onSuccess,
+  mode = "create",
+  planId,
 }: CreateWorkoutPlanDialogProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -53,6 +57,49 @@ export function CreateWorkoutPlanDialog({
     goals: "",
     duration_weeks: 4,
   });
+
+  useEffect(() => {
+    if (mode === 'edit' && planId && open) {
+      const fetchPlanDetails = async () => {
+        setIsSubmitting(true);
+        try {
+          const { data: plan, error: planError } = await supabase
+            .from('workout_plans')
+            .select('*')
+            .eq('id', planId)
+            .single();
+
+          if (planError) throw planError;
+          
+          const { data: planExercises, error: exercisesError } = await supabase
+            .from('workout_exercises')
+            .select('*')
+            .eq('plan_id', planId);
+
+          if (exercisesError) throw exercisesError;
+
+          setPlanData({
+            title: plan.title,
+            description: plan.description || "",
+            goals: plan.goals || "",
+            duration_weeks: plan.duration_weeks,
+          });
+          setExercises(planExercises || []);
+
+        } catch (error: any) {
+          toast({
+            title: "Failed to load plan",
+            description: error.message,
+            variant: "destructive",
+          });
+        } finally {
+          setIsSubmitting(false);
+        }
+      };
+      fetchPlanDetails();
+    }
+  }, [mode, planId, open]);
+
 
   const handlePlanSubmit = () => {
     if (!planData.title) {
@@ -92,87 +139,120 @@ export function CreateWorkoutPlanDialog({
     setIsSubmitting(true);
 
     try {
-      // Get assignment ID for this client-trainer pair
-      const { data: assignment, error: assignmentError } = await supabase
-        .from("trainer_assignments")
-        .select("id")
-        .eq("member_id", clientId)
-        .eq("trainer_id", trainerId)
-        .eq("status", "active")
-        .single();
+      if (mode === 'edit' && planId) {
+        // --- EDIT MODE LOGIC ---
+        const { error: planUpdateError } = await supabase
+          .from('workout_plans')
+          .update({
+            title: planData.title,
+            description: planData.description || null,
+            goals: planData.goals || null,
+            duration_weeks: planData.duration_weeks,
+          })
+          .eq('id', planId);
 
-      if (assignmentError || !assignment) {
-        throw new Error("No active assignment found for this client");
+        if (planUpdateError) throw planUpdateError;
+
+        // Replace exercises: delete old, insert new
+        await supabase.from('workout_exercises').delete().eq('plan_id', planId);
+
+        const exercisesToInsert = exercises.map((ex) => ({
+            plan_id: planId,
+            day_of_week: ex.day_of_week,
+            exercise_name: ex.exercise_name,
+            exercise_type: ex.exercise_type || null,
+            sets: ex.sets,
+            reps: ex.reps,
+            weight: ex.weight || null,
+            rest_seconds: ex.rest_seconds,
+            notes: ex.notes || null,
+            order_index: ex.order_index,
+        }));
+
+        const { error: exercisesError } = await supabase
+            .from("workout_exercises")
+            .insert(exercisesToInsert);
+        
+        if (exercisesError) throw exercisesError;
+
+        toast({
+          title: "Workout Plan Updated!",
+          description: `${planData.title} has been successfully updated.`,
+        });
+
+      } else {
+        // --- CREATE MODE LOGIC ---
+        if (!clientId) throw new Error("Client ID is missing for creating a plan.");
+
+        const { data: assignment, error: assignmentError } = await supabase
+          .from("trainer_assignments")
+          .select("id")
+          .eq("member_id", clientId)
+          .eq("trainer_id", trainerId)
+          .eq("status", "active")
+          .single();
+
+        if (assignmentError || !assignment) {
+          throw new Error("No active assignment found for this client");
+        }
+
+        const { data: plan, error: planError } = await supabase
+          .from("workout_plans")
+          .insert({
+            assignment_id: assignment.id,
+            title: planData.title,
+            description: planData.description || null,
+            goals: planData.goals || null,
+            duration_weeks: planData.duration_weeks,
+            created_by: trainerId,
+            status: "active",
+          })
+          .select()
+          .single();
+
+        if (planError || !plan) {
+          throw planError || new Error("Failed to create plan");
+        }
+
+        const exercisesToInsert = exercises.map((ex) => ({
+          plan_id: plan.id,
+          day_of_week: ex.day_of_week,
+          exercise_name: ex.exercise_name,
+          exercise_type: ex.exercise_type || null,
+          sets: ex.sets,
+          reps: ex.reps,
+          weight: ex.weight || null,
+          rest_seconds: ex.rest_seconds,
+          notes: ex.notes || null,
+          order_index: ex.order_index,
+        }));
+
+        const { error: exercisesError } = await supabase
+          .from("workout_exercises")
+          .insert(exercisesToInsert);
+
+        if (exercisesError) throw exercisesError;
+
+        await supabase.from("notifications").insert({
+          user_id: clientId,
+          type: "general",
+          title: "New Workout Plan Created",
+          message: `Your trainer has created a new workout plan: ${planData.title}`,
+          related_id: plan.id,
+        });
+
+        toast({
+          title: "Workout Plan Created!",
+          description: `${planData.title} has been created with ${exercises.length} exercises.`,
+        });
       }
-
-      // Create workout plan
-      const { data: plan, error: planError } = await supabase
-        .from("workout_plans")
-        .insert({
-          assignment_id: assignment.id,
-          title: planData.title,
-          description: planData.description || null,
-          goals: planData.goals || null,
-          duration_weeks: planData.duration_weeks,
-          created_by: trainerId,
-          status: "active",
-        })
-        .select()
-        .single();
-
-      if (planError || !plan) {
-        throw planError || new Error("Failed to create plan");
-      }
-
-      // Insert all exercises
-      const exercisesToInsert = exercises.map((ex) => ({
-        plan_id: plan.id,
-        day_of_week: ex.day_of_week,
-        exercise_name: ex.exercise_name,
-        exercise_type: ex.exercise_type || null,
-        sets: ex.sets,
-        reps: ex.reps,
-        weight: ex.weight || null,
-        rest_seconds: ex.rest_seconds,
-        notes: ex.notes || null,
-        order_index: ex.order_index,
-      }));
-
-      const { error: exercisesError } = await supabase
-        .from("workout_exercises")
-        .insert(exercisesToInsert);
-
-      if (exercisesError) throw exercisesError;
-
-      // Create notification for client
-      await supabase.from("notifications").insert({
-        user_id: clientId,
-        type: "general",
-        title: "New Workout Plan Created",
-        message: `Your trainer has created a new workout plan: ${planData.title}`,
-        related_id: plan.id,
-      });
-
-      toast({
-        title: "Workout Plan Created!",
-        description: `${planData.title} has been created with ${exercises.length} exercises.`,
-      });
 
       onSuccess();
-
-      // Reset form
-      setPlanData({
-        title: "",
-        description: "",
-        goals: "",
-        duration_weeks: 4,
-      });
-      setExercises([]);
-      setStep("plan");
+      handleCancel(); // Reset and close the dialog
     } catch (error: any) {
-      console.error("Error creating workout plan:", error);
+      console.error("Error submitting workout plan:", error);
       toast({
-        title: "Failed to Create Plan",
+        title: "Submission Failed",
         description: error.message || "Please try again.",
         variant: "destructive",
       });

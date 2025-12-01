@@ -9,6 +9,7 @@ import { Dumbbell, Clock, TrendingUp, Info, CheckCircle2, Circle, Timer } from "
 import { supabase } from "@/lib/supabaseClient";
 import { useSession } from "@/context/SessionProvider";
 import { LogWorkoutDialog } from "./LogWorkoutDialog";
+import { useToast } from "@/hooks/use-toast";
 
 interface WorkoutPlan {
   id: string;
@@ -48,6 +49,7 @@ const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "S
 
 export function WorkoutPlan() {
   const { session } = useSession();
+  const { toast } = useToast();
   const [plan, setPlan] = useState<WorkoutPlan | null>(null);
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [weekStats, setWeekStats] = useState<WeekStats | null>(null);
@@ -152,7 +154,22 @@ export function WorkoutPlan() {
     }
   };
 
-  const handleLogWorkout = (exercise: Exercise) => {
+  const handleLogWorkout = (exercise: Exercise, dayOfWeek: string) => {
+    // Check if trying to log for a past day
+    const today = DAYS_OF_WEEK[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
+    const todayIndex = DAYS_OF_WEEK.indexOf(today);
+    const selectedDayIndex = DAYS_OF_WEEK.indexOf(dayOfWeek);
+
+    if (selectedDayIndex < todayIndex) {
+      // Trying to log a past day
+      toast({
+        title: "Cannot Log Past Workouts",
+        description: `You cannot log workouts for past days. Today is ${today}. Please log workouts on the day you complete them for accurate tracking.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSelectedExercise(exercise);
     setLogDialogOpen(true);
   };
@@ -201,6 +218,14 @@ export function WorkoutPlan() {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+
+  // Helper function to check if a day is in the past
+  const isPastDay = (dayOfWeek: string) => {
+    const today = DAYS_OF_WEEK[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
+    const todayIndex = DAYS_OF_WEEK.indexOf(today);
+    const dayIndex = DAYS_OF_WEEK.indexOf(dayOfWeek);
+    return dayIndex < todayIndex;
   };
 
   return (
@@ -299,6 +324,17 @@ export function WorkoutPlan() {
 
             {DAYS_OF_WEEK.map((day) => (
               <TabsContent key={day} value={day} className="space-y-4">
+                {/* Warning for past days */}
+                {isPastDay(day) && (
+                  <Alert variant="destructive" className="mb-4">
+                    <Info className="h-4 w-4" />
+                    <AlertDescription>
+                      <strong>Past Day Notice:</strong> {day} has passed. You cannot log workouts for past days.
+                      Please log workouts on the day you complete them for accurate tracking.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
                 {exercisesForDay.length === 0 ? (
                   <Alert>
                     <Info className="h-4 w-4" />
@@ -395,13 +431,13 @@ export function WorkoutPlan() {
                             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto mt-3 sm:mt-0">
                               {exercise.is_completed && (
                                 <div className="flex items-center gap-1.5 text-green-600 text-sm font-semibold px-3 py-2 bg-green-500/10 rounded-md">
-                                  <CheckCircle className="w-4 h-4" />
+                                  <CheckCircle2 className="w-4 h-4" />
                                   <span className="hidden sm:inline">Completed</span>
                                   <span className="sm:hidden">Done</span>
                                 </div>
                               )}
                               <Button
-                                onClick={() => handleLogWorkout(exercise)}
+                                onClick={() => handleLogWorkout(exercise, day)}
                                 disabled={exercise.is_completed}
                                 variant={exercise.is_completed ? "outline" : "default"}
                                 size="sm"

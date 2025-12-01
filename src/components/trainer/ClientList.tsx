@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { User, Calendar, TrendingUp, Plus, Info, Dumbbell } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 
 interface Client {
@@ -16,6 +17,8 @@ interface Client {
   assigned_at: string;
   status: string;
   has_active_plan: boolean;
+  compliance_percentage?: number;
+  workouts_logged?: number;
 }
 
 interface ClientListProps {
@@ -27,6 +30,7 @@ export function ClientList({ trainerId, onCreatePlan }: ClientListProps) {
   const [clients, setClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (trainerId) {
@@ -60,36 +64,53 @@ export function ClientList({ trainerId, onCreatePlan }: ClientListProps) {
 
       if (assignmentsError) throw assignmentsError;
 
-      // For each assignment, check if they have an active workout plan
-      const clientsWithPlans = await Promise.all(
-        (assignments || []).map(async (assignment: any) => {
-          const profile = Array.isArray(assignment.profiles)
-            ? assignment.profiles[0]
-            : assignment.profiles;
+      if (!assignments || assignments.length === 0) {
+        setClients([]);
+        setIsLoading(false);
+        return;
+      }
 
-          // Check for active workout plan
-          const { data: planData } = await supabase
-            .from("workout_plans")
-            .select("id")
-            .eq("assignment_id", assignment.id)
-            .eq("status", "active")
-            .single();
+      // Get all assignment IDs
+      const assignmentIds = assignments.map((a) => a.id);
 
-          return {
-            id: assignment.id,
-            member_id: assignment.member_id,
-            member_name: profile
-              ? `${profile.first_name} ${profile.last_name}`
-              : "Unknown",
-            member_email: profile?.email || "",
-            assigned_at: assignment.assigned_at,
-            status: assignment.status,
-            has_active_plan: !!planData,
-          };
-        })
+      // Fetch stats for all clients in a single batch call
+      const { data: statsData, error: statsError } = await supabase.rpc(
+        "get_batch_client_stats",
+        { p_assignment_ids: assignmentIds }
       );
 
-      setClients(clientsWithPlans);
+      if (statsError) {
+        console.error("Error fetching client stats:", statsError);
+        // Continue without stats rather than failing completely
+      }
+
+      // Merge assignment data with stats
+      const clientsWithStats = assignments.map((assignment: any) => {
+        const profile = Array.isArray(assignment.profiles)
+          ? assignment.profiles[0]
+          : assignment.profiles;
+
+        // Find stats for this assignment
+        const stats = statsData?.find(
+          (s: any) => s.assignment_id === assignment.id
+        );
+
+        return {
+          id: assignment.id,
+          member_id: assignment.member_id,
+          member_name: profile
+            ? `${profile.first_name} ${profile.last_name}`
+            : "Unknown",
+          member_email: profile?.email || "",
+          assigned_at: assignment.assigned_at,
+          status: assignment.status,
+          has_active_plan: stats?.has_active_plan || false,
+          compliance_percentage: stats?.compliance_percentage || 0,
+          workouts_logged: stats?.workouts_logged || 0,
+        };
+      });
+
+      setClients(clientsWithStats);
     } catch (err: any) {
       console.error("Error fetching clients:", err);
       setError(err.message || "Failed to load clients");
@@ -176,17 +197,23 @@ export function ClientList({ trainerId, onCreatePlan }: ClientListProps) {
                     </div>
                   </div>
 
-                  {/* Quick Stats Placeholder */}
-                  <div className="mt-3 flex gap-4 text-sm">
-                    <div className="flex items-center gap-1">
-                      <TrendingUp className="w-4 h-4 text-primary" />
-                      <span className="text-foreground">--% compliance</span>
+                  {/* Quick Stats */}
+                  {client.has_active_plan && (
+                    <div className="mt-3 flex gap-4 text-sm">
+                      <div className="flex items-center gap-1">
+                        <TrendingUp className="w-4 h-4 text-primary" />
+                        <span className="text-foreground font-semibold">
+                          {client.compliance_percentage?.toFixed(1)}% compliance
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Dumbbell className="w-4 h-4 text-primary" />
+                        <span className="text-foreground font-semibold">
+                          {client.workouts_logged} workouts logged
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Dumbbell className="w-4 h-4 text-primary" />
-                      <span className="text-foreground">-- workouts logged</span>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
 
@@ -206,6 +233,7 @@ export function ClientList({ trainerId, onCreatePlan }: ClientListProps) {
                   variant="outline"
                   size="sm"
                   className="border-primary text-primary hover:bg-primary/10"
+                  onClick={() => navigate(`/trainer-dashboard/client/${client.id}`)}
                 >
                   View Details
                 </Button>

@@ -48,6 +48,7 @@ export function LogWorkoutDialog({
     duration_minutes: 0,
     notes: "",
     rating: 3,
+    workout_date: new Date().toISOString().split('T')[0], // Today's date in YYYY-MM-DD format
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -72,7 +73,7 @@ export function LogWorkoutDialog({
         p_plan_id: exercise.plan_id,
         p_sets_completed: formData.sets_completed,
         p_reps_completed: formData.reps_completed,
-        p_weight_used: formData.weight_used > 0 ? `${formData.weight_used} lbs` : null,
+        p_weight_used: formData.weight_used > 0 ? `${formData.weight_used}` : null,
         p_duration_minutes: formData.duration_minutes > 0 ? formData.duration_minutes : null,
         p_rating: formData.rating,
         p_notes: formData.notes || null,
