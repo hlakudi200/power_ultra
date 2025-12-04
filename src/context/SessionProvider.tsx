@@ -169,6 +169,12 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         setIsNewLogin(false);
         setProfile(null);
         setLoading(false);
+      } else if (event === 'PASSWORD_RECOVERY') {
+        console.log('[SessionProvider] Handling PASSWORD_RECOVERY event');
+        // For password recovery, we have a session but don't need to fetch profile yet
+        // The UpdatePassword page will handle this
+        setProfile(null);
+        setLoading(false);
       } else if (event === 'INITIAL_SESSION') {
         console.log('[SessionProvider] Handling INITIAL_SESSION event');
         if (session?.user) {
