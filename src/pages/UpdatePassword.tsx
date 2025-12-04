@@ -16,23 +16,69 @@ const UpdatePasswordPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSession, setHasSession] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
 
   useEffect(() => {
-    // Supabase automatically handles the session when the user clicks the magic link.
-    // We just need to check if a session is active.
-    supabase.auth.getSession().then(({ data: { session } }) => {
-        if(session) {
-            setHasSession(true);
-        }
-    });
+    let mounted = true;
 
+    const checkSession = async () => {
+      console.log('[UpdatePassword] Checking for recovery session...');
+      console.log('[UpdatePassword] URL hash:', window.location.hash);
+
+      // Check if we have an access_token in the URL hash
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+      const type = hashParams.get('type');
+
+      console.log('[UpdatePassword] Hash params:', { accessToken: accessToken ? 'present' : 'missing', type });
+
+      // If there's a recovery token in the URL, wait for Supabase to process it
+      if (accessToken && type === 'recovery') {
+        console.log('[UpdatePassword] Recovery token found in URL, waiting for session...');
+
+        // Wait a bit for Supabase to establish the session
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
+      // Now check for session
+      const { data: { session }, error } = await supabase.auth.getSession();
+
+      console.log('[UpdatePassword] Session check result:', {
+        hasSession: !!session,
+        error: error?.message,
+        sessionUser: session?.user?.email
+      });
+
+      if (mounted) {
+        if (session) {
+          console.log('[UpdatePassword] Valid session found');
+          setHasSession(true);
+        } else {
+          console.log('[UpdatePassword] No valid session');
+        }
+        setIsCheckingSession(false);
+      }
+    };
+
+    checkSession();
+
+    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-        if (event === "PASSWORD_RECOVERY") {
-            setHasSession(true);
+      console.log('[UpdatePassword] Auth state changed:', event, session ? 'has session' : 'no session');
+
+      if (mounted) {
+        if (event === "PASSWORD_RECOVERY" || (session && event === "SIGNED_IN")) {
+          console.log('[UpdatePassword] Password recovery session established');
+          setHasSession(true);
+          setIsCheckingSession(false);
         }
+      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -71,6 +117,23 @@ const UpdatePasswordPage = () => {
     }
   };
   
+  // Show loading while checking session
+  if (isCheckingSession) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center gap-4">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Verifying reset link...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show error if no valid session after checking
   if (!hasSession) {
     return (
         <div className="flex min-h-screen items-center justify-center bg-background">
