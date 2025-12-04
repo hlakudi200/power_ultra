@@ -22,6 +22,7 @@ import Memberships from "./pages/admin/Memberships";
 import Instructors from "./pages/admin/Instructors";
 import Analytics from "./pages/admin/Analytics";
 import Settings from "./pages/admin/Settings";
+import UpdatePasswordPage from "./pages/UpdatePassword";
 
 import { SessionProvider, useSession } from "./context/SessionProvider";
 import { useToast } from "@/components/ui/use-toast"; // Keep useToast for ProtectedRoute
@@ -47,9 +48,16 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
 
   // Effect 1: Check authentication status, fetch profile, and determine role
   useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
     const checkMembershipAndRole = async () => {
-      if (!loading && !session) {
+      console.log('[ProtectedRoute] Loading:', loading, 'Session:', session ? 'exists' : 'none');
+
+      if (loading) return; // Wait for session to be loaded
+
+      if (!session) {
         // Not authenticated
+        console.log('[ProtectedRoute] No session, redirecting to home');
         navigate("/");
         toast({
           title: "Access Denied",
@@ -59,21 +67,45 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
         return;
       }
 
-      if (session && !isMembershipChecked) {
-        setIsProfileLoading(true);
+      // If we have a session, proceed with checks
+      console.log('[ProtectedRoute] Session found, checking profile...');
+      setIsProfileLoading(true);
 
-        // Fetch user profile
-        const { data: profile, error: profileError } = await supabase
+      // Set a timeout to prevent hanging forever
+      timeoutId = setTimeout(() => {
+        console.error('Profile loading timeout - forcing completion');
+        setIsProfileLoading(false);
+        setIsMembershipChecked(true);
+      }, 5000); // 5 second timeout
+
+      try {
+        // Fetch user profile with timeout
+        console.log('[ProtectedRoute] Fetching profile from database...');
+
+        const profilePromise = supabase
           .from("profiles")
           .select("membership_expiry_date, is_admin, role")
           .eq("id", session.user.id)
           .single();
 
+        const profileTimeoutPromise = new Promise<{ data: null; error: { message: string; code: string } }>((_, reject) =>
+          setTimeout(() => {
+            console.error('[ProtectedRoute] Profile query TIMEOUT - RLS issue detected');
+            reject({ data: null, error: { message: 'Query timeout', code: 'TIMEOUT' } });
+          }, 3000)
+        );
+
+        const profileResult = await Promise.race([profilePromise, profileTimeoutPromise]);
+        const { data: profile, error: profileError } = profileResult;
+
+        console.log('[ProtectedRoute] Profile fetch result:', { profile, profileError });
+
         if (profileError) {
-          console.error("Error fetching profile for membership check:", profileError);
+          console.error("[ProtectedRoute] Error fetching profile for membership check:", profileError);
           setHasActiveMembership(false);
           setUserRole({ isAdmin: false, isTrainer: false });
         } else {
+          console.log('[ProtectedRoute] Profile found, checking role...');
           // Check if user is a trainer
           const { data: trainerData } = await supabase
             .from("instructors")
@@ -83,25 +115,40 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
             .maybeSingle();
 
           const isTrainer = !!trainerData;
-          const isAdmin = profile?.is_admin === true;
+          const isAdmin = profile?.role === 'admin'; // Using the safer role check
 
+          console.log('[ProtectedRoute] Role check:', { isTrainer, isAdmin });
           setUserRole({ isAdmin, isTrainer });
 
-          // Admins don't need active membership
-          if (isAdmin) {
+          // Admins and trainers don't need active membership to access their dashboards
+          if (isAdmin || isTrainer) {
             setHasActiveMembership(true);
+            console.log('[ProtectedRoute] Admin/Trainer access granted');
           } else {
             const expiryDate = profile?.membership_expiry_date ? new Date(profile.membership_expiry_date) : null;
-            setHasActiveMembership(expiryDate && expiryDate > new Date());
+            const hasAccess = expiryDate && expiryDate > new Date();
+            setHasActiveMembership(!!hasAccess);
+            console.log('[ProtectedRoute] Membership check:', { expiryDate, hasAccess });
           }
         }
+      } catch (error) {
+        console.error('[ProtectedRoute] Unexpected error in checkMembershipAndRole:', error);
+        setHasActiveMembership(false);
+        setUserRole({ isAdmin: false, isTrainer: false });
+      } finally {
+        clearTimeout(timeoutId);
         setIsProfileLoading(false);
-        setIsMembershipChecked(true);
+        setIsMembershipChecked(true); // Mark as checked
+        console.log('[ProtectedRoute] Check complete');
       }
     };
 
     checkMembershipAndRole();
-  }, [session, loading, navigate, isMembershipChecked, toast]);
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [session, loading, navigate, toast]);
 
   // Effect 2: Handle role-based redirection
   useEffect(() => {
@@ -162,6 +209,7 @@ const AppRoutes = () => {
       <Route path="/" element={<Layout />}> {/* Use Layout as parent for all main routes */}
         <Route index element={<Index />} /> {/* Index route for / */}
         <Route path="/setup-profile" element={<SetupProfile />} />
+        <Route path="/update-password" element={<UpdatePasswordPage />} />
 
         {/* Protected Routes */}
         <Route
