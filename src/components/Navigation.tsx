@@ -9,6 +9,8 @@ import { NotificationBell } from "./NotificationBell";
 import { supabase } from "@/lib/supabaseClient";
 import { Link, useNavigate, useLocation } from "react-router-dom"; // Import Link, useNavigate, and useLocation
 
+import { useToast } from "@/hooks/use-toast";
+
 const navLinks = [
   { name: "Home", href: "#home" },
   { name: "About", href: "#about" },
@@ -19,14 +21,25 @@ const navLinks = [
   { name: "Contact", href: "#contact" },
 ];
 
+const trainerNavLinks = [
+  { name: "Dashboard", href: "/trainer-dashboard" },
+  { name: "Clients", href: "/trainer-dashboard/clients" },
+];
+
 const Navigation = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
-  const { session } = useSession();
-  const navigate = useNavigate(); // Initialize useNavigate
-  const location = useLocation(); // Initialize useLocation
+  const { session, profile } = useSession();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { toast } = useToast();
 
+  const isTrainerDashboard = location.pathname.startsWith('/trainer-dashboard');
+  const isTrainer = profile?.role === 'trainer';
+
+  const currentNavLinks = isTrainer && isTrainerDashboard ? trainerNavLinks : navLinks;
+  
   // Handle scroll effect
   useEffect(() => {
     const handleScroll = () => {
@@ -51,8 +64,23 @@ const Navigation = () => {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate("/"); // Navigate to home after logout
+    try {
+      toast({ title: "Logging out..." });
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+
+      toast({
+        title: "Logged out successfully",
+        description: "You have been signed out of your account.",
+      });
+      navigate("/"); // Navigate to home after logout
+    } catch (error) {
+      toast({
+        title: "Logout failed",
+        description: "There was an error signing out. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const AuthButton = () => {
@@ -115,23 +143,29 @@ const Navigation = () => {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-1">
-              {navLinks.map((link) => (
+              {currentNavLinks.map((link) => (
                 <Button
                   key={link.name}
                   variant="ghost"
-                  onClick={() => scrollToSection(link.href)}
+                  onClick={() => {
+                    if (link.href.startsWith('/')) {
+                      navigate(link.href);
+                    } else {
+                      scrollToSection(link.href);
+                    }
+                  }}
                   className="text-foreground hover:text-primary hover:bg-primary/10 transition-all duration-300 font-semibold"
                 >
                   {link.name}
                 </Button>
               ))}
-              {session && ( // Conditionally render Dashboard link for authenticated users
+              {session && !isTrainerDashboard && (
                 <Button
                   key="Dashboard"
                   variant="ghost"
                   onClick={() => {
                     navigate("/dashboard");
-                    setIsMobileMenuOpen(false); // Close mobile menu if open
+                    setIsMobileMenuOpen(false);
                   }}
                   className="text-foreground hover:text-primary hover:bg-primary/10 transition-all duration-300 font-semibold"
                 >
@@ -172,16 +206,23 @@ const Navigation = () => {
 
                   <div className="flex-1 overflow-y-auto p-6">
                     <div className="flex flex-col gap-4">
-                      {navLinks.map((link) => (
+                      {currentNavLinks.map((link) => (
                         <button
                           key={link.name}
-                          onClick={() => scrollToSection(link.href)}
+                          onClick={() => {
+                            if (link.href.startsWith('/')) {
+                               navigate(link.href)
+                            } else {
+                               scrollToSection(link.href)
+                            }
+                            setIsMobileMenuOpen(false);
+                          }}
                           className="text-left text-lg font-semibold text-foreground transition-colors duration-300 hover:text-primary py-2"
                         >
                           {link.name}
                         </button>
                       ))}
-                      {session && (
+                      {session && !isTrainerDashboard && (
                         <button
                           key="Dashboard"
                           onClick={() => {
