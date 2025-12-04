@@ -20,43 +20,77 @@ const UpdatePasswordPage = () => {
   const [isCheckingSession, setIsCheckingSession] = useState(true);
 
   useEffect(() => {
-    console.log('[UpdatePassword] Component mounted');
-    console.log('[UpdatePassword] URL hash:', window.location.hash);
+    let mounted = true;
 
-    // Check if we have a recovery token in URL
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const type = hashParams.get('type');
-    const hasRecoveryToken = type === 'recovery';
+    const handleRecoveryToken = async () => {
+      console.log('[UpdatePassword] Component mounted');
+      console.log('[UpdatePassword] URL hash:', window.location.hash);
 
-    console.log('[UpdatePassword] Has recovery token in URL:', hasRecoveryToken);
+      // Extract tokens from URL hash
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const type = hashParams.get('type');
+      const accessToken = hashParams.get('access_token');
 
-    // If SessionProvider is still loading, wait for it
-    if (sessionLoading) {
-      console.log('[UpdatePassword] Waiting for SessionProvider to finish loading...');
-      return;
-    }
+      console.log('[UpdatePassword] Hash params:', { type, hasAccessToken: !!accessToken });
 
-    // SessionProvider finished loading, check results
-    console.log('[UpdatePassword] SessionProvider loaded. Session:', session ? 'exists' : 'none');
+      // If no recovery token in URL, rely on existing session
+      if (type !== 'recovery' || !accessToken) {
+        console.log('[UpdatePassword] No recovery token, checking existing session...');
 
-    if (session) {
-      console.log('[UpdatePassword] Valid recovery session found');
-      setIsCheckingSession(false);
-    } else if (!hasRecoveryToken) {
-      // No token in URL and no session = invalid link
-      console.log('[UpdatePassword] No recovery token and no session - invalid link');
-      setIsCheckingSession(false);
-    } else {
-      // Has token but no session yet - wait a bit more
-      console.log('[UpdatePassword] Recovery token present but no session yet, waiting...');
-      const timer = setTimeout(() => {
-        console.log('[UpdatePassword] Timeout waiting for session');
-        setIsCheckingSession(false);
-      }, 3000);
+        if (sessionLoading) {
+          console.log('[UpdatePassword] Waiting for SessionProvider...');
+          return;
+        }
 
-      return () => clearTimeout(timer);
-    }
-  }, [session, sessionLoading]);
+        if (mounted) {
+          setIsCheckingSession(false);
+        }
+        return;
+      }
+
+      // We have a recovery token - manually verify it
+      console.log('[UpdatePassword] Recovery token found, verifying with Supabase...');
+
+      try {
+        // Use the access_token to set the session
+        const { data: { session: recoverySession }, error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: hashParams.get('refresh_token') || '',
+        });
+
+        if (error) {
+          console.error('[UpdatePassword] Error setting session:', error);
+          if (mounted) {
+            setIsCheckingSession(false);
+          }
+          return;
+        }
+
+        if (recoverySession) {
+          console.log('[UpdatePassword] Recovery session established successfully');
+          if (mounted) {
+            setIsCheckingSession(false);
+          }
+        } else {
+          console.error('[UpdatePassword] No session returned from setSession');
+          if (mounted) {
+            setIsCheckingSession(false);
+          }
+        }
+      } catch (error) {
+        console.error('[UpdatePassword] Exception verifying recovery token:', error);
+        if (mounted) {
+          setIsCheckingSession(false);
+        }
+      }
+    };
+
+    handleRecoveryToken();
+
+    return () => {
+      mounted = false;
+    };
+  }, [sessionLoading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
