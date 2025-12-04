@@ -18,6 +18,7 @@ const UpdatePasswordPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [hasRecoveryToken, setHasRecoveryToken] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -79,8 +80,10 @@ const UpdatePasswordPage = () => {
 
         if (result instanceof Error) {
           console.error('[UpdatePassword] setSession timed out after 5s');
-          // Show the form anyway - user might still be able to update password
+          console.log('[UpdatePassword] Allowing password update with recovery token anyway');
+          // Mark that we have a recovery token so password update can proceed
           if (mounted) {
+            setHasRecoveryToken(true);
             setIsCheckingSession(false);
           }
           return;
@@ -90,7 +93,9 @@ const UpdatePasswordPage = () => {
 
         if (error) {
           console.error('[UpdatePassword] Error setting session:', error);
+          // Still allow password update attempt
           if (mounted) {
+            setHasRecoveryToken(true);
             setIsCheckingSession(false);
           }
           return;
@@ -104,12 +109,14 @@ const UpdatePasswordPage = () => {
         } else {
           console.error('[UpdatePassword] No session returned from setSession');
           if (mounted) {
+            setHasRecoveryToken(true);
             setIsCheckingSession(false);
           }
         }
       } catch (error) {
         console.error('[UpdatePassword] Exception setting session:', error);
         if (mounted) {
+          setHasRecoveryToken(true);
           setIsCheckingSession(false);
         }
       }
@@ -174,8 +181,8 @@ const UpdatePasswordPage = () => {
     );
   }
 
-  // Show error if no valid session after checking
-  if (!session) {
+  // Show error if no valid session AND no recovery token after checking
+  if (!session && !hasRecoveryToken) {
     return (
         <div className="flex min-h-screen items-center justify-center bg-background">
             <Card className="w-full max-w-md">
