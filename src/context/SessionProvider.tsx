@@ -117,8 +117,15 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     console.log('[SessionProvider] Initializing...');
 
+    // Add a safety timeout to prevent hanging forever
+    const safetyTimeout = setTimeout(() => {
+      console.warn('[SessionProvider] Safety timeout triggered - forcing loading to complete');
+      setLoading(false);
+    }, 3000);
+
     // Step 1: Get initial session (following Supabase best practices)
     supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+      clearTimeout(safetyTimeout);
       console.log('[SessionProvider] Initial session check:', session ? 'Found' : 'Not found');
 
       if (error) {
@@ -135,6 +142,10 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         setProfile(profileData);
       }
 
+      setLoading(false);
+    }).catch((error) => {
+      clearTimeout(safetyTimeout);
+      console.error('[SessionProvider] getSession() failed:', error);
       setLoading(false);
     });
 
@@ -205,6 +216,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
     return () => {
       console.log('[SessionProvider] Cleaning up subscription');
+      clearTimeout(safetyTimeout);
       subscription?.unsubscribe();
     };
   }, []);
