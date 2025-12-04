@@ -33,30 +33,60 @@ const UpdatePasswordPage = () => {
 
       console.log('[UpdatePassword] Hash params:', { type, hasAccessToken: !!accessToken });
 
-      // If no recovery token in URL, rely on existing session
-      if (type !== 'recovery' || !accessToken) {
-        console.log('[UpdatePassword] No recovery token, checking existing session...');
+      // WAIT for SessionProvider to finish loading first
+      // This is critical because detectSessionInUrl might be processing the URL
+      if (sessionLoading) {
+        console.log('[UpdatePassword] Waiting for SessionProvider to finish...');
+        return;
+      }
 
-        if (sessionLoading) {
-          console.log('[UpdatePassword] Waiting for SessionProvider...');
-          return;
-        }
+      console.log('[UpdatePassword] SessionProvider finished. Session:', session ? 'exists' : 'none');
 
+      // If SessionProvider already established a session, we're done!
+      if (session) {
+        console.log('[UpdatePassword] Session already established by SessionProvider ✅');
         if (mounted) {
           setIsCheckingSession(false);
         }
         return;
       }
 
-      // We have a recovery token - manually verify it
-      console.log('[UpdatePassword] Recovery token found, verifying with Supabase...');
+      // No recovery token in URL and no session
+      if (type !== 'recovery' || !accessToken) {
+        console.log('[UpdatePassword] No recovery token and no session - invalid link');
+        if (mounted) {
+          setIsCheckingSession(false);
+        }
+        return;
+      }
+
+      // SessionProvider didn't establish session, but we have a recovery token
+      // This means detectSessionInUrl failed, so we manually set the session
+      console.log('[UpdatePassword] Manually setting session with recovery token...');
 
       try {
-        // Use the access_token to set the session
-        const { data: { session: recoverySession }, error } = await supabase.auth.setSession({
+        // Add timeout to prevent hanging
+        const setSessionPromise = supabase.auth.setSession({
           access_token: accessToken,
           refresh_token: hashParams.get('refresh_token') || '',
         });
+
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('setSession timeout')), 5000)
+        );
+
+        const result = await Promise.race([setSessionPromise, timeoutPromise]) as any;
+
+        if (result instanceof Error) {
+          console.error('[UpdatePassword] setSession timed out after 5s');
+          // Show the form anyway - user might still be able to update password
+          if (mounted) {
+            setIsCheckingSession(false);
+          }
+          return;
+        }
+
+        const { data: { session: recoverySession }, error } = result;
 
         if (error) {
           console.error('[UpdatePassword] Error setting session:', error);
@@ -67,7 +97,7 @@ const UpdatePasswordPage = () => {
         }
 
         if (recoverySession) {
-          console.log('[UpdatePassword] Recovery session established successfully');
+          console.log('[UpdatePassword] Recovery session established successfully ✅');
           if (mounted) {
             setIsCheckingSession(false);
           }
@@ -78,7 +108,7 @@ const UpdatePasswordPage = () => {
           }
         }
       } catch (error) {
-        console.error('[UpdatePassword] Exception verifying recovery token:', error);
+        console.error('[UpdatePassword] Exception setting session:', error);
         if (mounted) {
           setIsCheckingSession(false);
         }
@@ -90,7 +120,7 @@ const UpdatePasswordPage = () => {
     return () => {
       mounted = false;
     };
-  }, [sessionLoading]);
+  }, [session, sessionLoading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
