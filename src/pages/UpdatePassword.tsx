@@ -7,79 +7,56 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { useSession } from "@/context/SessionProvider";
 
 const UpdatePasswordPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { session, loading: sessionLoading } = useSession();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hasSession, setHasSession] = useState(false);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
 
   useEffect(() => {
-    let mounted = true;
+    console.log('[UpdatePassword] Component mounted');
+    console.log('[UpdatePassword] URL hash:', window.location.hash);
 
-    const checkSession = async () => {
-      console.log('[UpdatePassword] Checking for recovery session...');
-      console.log('[UpdatePassword] URL hash:', window.location.hash);
+    // Check if we have a recovery token in URL
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const type = hashParams.get('type');
+    const hasRecoveryToken = type === 'recovery';
 
-      // Check if we have an access_token in the URL hash
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const accessToken = hashParams.get('access_token');
-      const type = hashParams.get('type');
+    console.log('[UpdatePassword] Has recovery token in URL:', hasRecoveryToken);
 
-      console.log('[UpdatePassword] Hash params:', { accessToken: accessToken ? 'present' : 'missing', type });
+    // If SessionProvider is still loading, wait for it
+    if (sessionLoading) {
+      console.log('[UpdatePassword] Waiting for SessionProvider to finish loading...');
+      return;
+    }
 
-      // If there's a recovery token in the URL, wait for Supabase to process it
-      if (accessToken && type === 'recovery') {
-        console.log('[UpdatePassword] Recovery token found in URL, waiting for session...');
+    // SessionProvider finished loading, check results
+    console.log('[UpdatePassword] SessionProvider loaded. Session:', session ? 'exists' : 'none');
 
-        // Wait a bit for Supabase to establish the session
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-
-      // Now check for session
-      const { data: { session }, error } = await supabase.auth.getSession();
-
-      console.log('[UpdatePassword] Session check result:', {
-        hasSession: !!session,
-        error: error?.message,
-        sessionUser: session?.user?.email
-      });
-
-      if (mounted) {
-        if (session) {
-          console.log('[UpdatePassword] Valid session found');
-          setHasSession(true);
-        } else {
-          console.log('[UpdatePassword] No valid session');
-        }
+    if (session) {
+      console.log('[UpdatePassword] Valid recovery session found');
+      setIsCheckingSession(false);
+    } else if (!hasRecoveryToken) {
+      // No token in URL and no session = invalid link
+      console.log('[UpdatePassword] No recovery token and no session - invalid link');
+      setIsCheckingSession(false);
+    } else {
+      // Has token but no session yet - wait a bit more
+      console.log('[UpdatePassword] Recovery token present but no session yet, waiting...');
+      const timer = setTimeout(() => {
+        console.log('[UpdatePassword] Timeout waiting for session');
         setIsCheckingSession(false);
-      }
-    };
+      }, 3000);
 
-    checkSession();
-
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('[UpdatePassword] Auth state changed:', event, session ? 'has session' : 'no session');
-
-      if (mounted) {
-        if (event === "PASSWORD_RECOVERY" || (session && event === "SIGNED_IN")) {
-          console.log('[UpdatePassword] Password recovery session established');
-          setHasSession(true);
-          setIsCheckingSession(false);
-        }
-      }
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
+      return () => clearTimeout(timer);
+    }
+  }, [session, sessionLoading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -118,7 +95,7 @@ const UpdatePasswordPage = () => {
   };
   
   // Show loading while checking session
-  if (isCheckingSession) {
+  if (sessionLoading || isCheckingSession) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Card className="w-full max-w-md">
@@ -134,7 +111,7 @@ const UpdatePasswordPage = () => {
   }
 
   // Show error if no valid session after checking
-  if (!hasSession) {
+  if (!session) {
     return (
         <div className="flex min-h-screen items-center justify-center bg-background">
             <Card className="w-full max-w-md">
