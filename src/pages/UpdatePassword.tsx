@@ -144,16 +144,53 @@ const UpdatePasswordPage = () => {
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) throw error;
+      // Extract access token from URL if we don't have a session
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+
+      if (!session && accessToken) {
+        console.log('[UpdatePassword] No session, using direct API call with access token');
+
+        // Call Supabase REST API directly
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({ password }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to update password');
+        }
+
+        console.log('[UpdatePassword] Password updated successfully via direct API');
+      } else {
+        // Use normal Supabase client if we have a session
+        console.log('[UpdatePassword] Using Supabase client updateUser');
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) throw error;
+      }
 
       toast({
         title: "Password Updated",
         description: "Your password has been successfully updated. Please sign in.",
       });
-      await supabase.auth.signOut();
+
+      // Sign out and redirect
+      try {
+        await supabase.auth.signOut();
+      } catch (signOutError) {
+        console.warn('[UpdatePassword] Sign out failed, but password was updated:', signOutError);
+      }
+
       navigate("/");
     } catch (error: any) {
+      console.error('[UpdatePassword] Error updating password:', error);
       setError(error.message);
       toast({
         title: "Error Updating Password",
