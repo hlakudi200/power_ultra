@@ -14,7 +14,7 @@ import Footer from "@/components/Footer";
 const Index = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { session, loading, isNewLogin } = useSession();
+  const { session, loading, isNewLogin, resetNewLogin } = useSession();
   const [isCheckingRole, setIsCheckingRole] = useState(false);
 
   // Effect to scroll to hash on load or hash change
@@ -78,6 +78,7 @@ const Index = () => {
             if (window.location.hash) {
               window.history.replaceState(null, '', window.location.pathname);
             }
+            resetNewLogin(); // Reset flag before navigation
             navigate("/admin", { replace: true });
             return;
           }
@@ -100,6 +101,7 @@ const Index = () => {
             if (window.location.hash) {
               window.history.replaceState(null, '', window.location.pathname);
             }
+            resetNewLogin(); // Reset flag before navigation
             navigate("/trainer-dashboard", { replace: true });
             return;
           }
@@ -111,9 +113,11 @@ const Index = () => {
           if (window.location.hash) {
             window.history.replaceState(null, '', window.location.pathname);
           }
+          resetNewLogin(); // Reset flag after processing
           setIsCheckingRole(false);
         } catch (error) {
           console.error("Error in role check:", error);
+          resetNewLogin(); // Reset flag even on error
           setIsCheckingRole(false);
         }
       } else {

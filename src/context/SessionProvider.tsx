@@ -14,6 +14,7 @@ type SessionContextType = {
   profile: Profile;
   loading: boolean;
   isNewLogin: boolean;
+  resetNewLogin: () => void;
 };
 
 const SessionContext = createContext<SessionContextType>({
@@ -21,6 +22,7 @@ const SessionContext = createContext<SessionContextType>({
   profile: null,
   loading: true,
   isNewLogin: false,
+  resetNewLogin: () => {},
 });
 
 export const useSession = () => useContext(SessionContext);
@@ -162,13 +164,23 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         try {
           // Handle Google sign-in profile creation
           if (session.user.app_metadata.provider === 'google') {
-            await handleGoogleSignIn(session.user);
+            console.log('[SessionProvider] Google sign-in detected, creating/updating profile');
+            const result = await handleGoogleSignIn(session.user);
+            if (result.success) {
+              // Profile was created/updated by handleGoogleSignIn, just fetch it
+              const profileData = await fetchProfile(session.user.id, session.user.email);
+              setProfile(profileData);
+              console.log('[SessionProvider] Google profile set after SIGNED_IN');
+            } else {
+              console.error('[SessionProvider] Failed to create Google profile:', result.error);
+              setProfile(null);
+            }
+          } else {
+            // For email/password sign-in, fetch or create profile
+            const profileData = await fetchProfile(session.user.id, session.user.email);
+            setProfile(profileData);
+            console.log('[SessionProvider] Profile set after SIGNED_IN');
           }
-
-          // Fetch or create profile
-          const profileData = await fetchProfile(session.user.id, session.user.email);
-          setProfile(profileData);
-          console.log('[SessionProvider] Profile set after SIGNED_IN');
         } catch (error) {
           console.error('[SessionProvider] Error handling SIGNED_IN:', error);
           setProfile(null);
@@ -221,8 +233,12 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
+  const resetNewLogin = () => {
+    setIsNewLogin(false);
+  };
+
   return (
-    <SessionContext.Provider value={{ session, profile, loading, isNewLogin }}>
+    <SessionContext.Provider value={{ session, profile, loading, isNewLogin, resetNewLogin }}>
       {children}
     </SessionContext.Provider>
   );
