@@ -28,9 +28,10 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
-import { Search, UserPlus, Edit, Trash2, Calendar, Users } from "lucide-react";
+import { Search, UserPlus, Edit, Trash2, Calendar, Users, GraduationCap } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { AssignTrainerDialog } from "@/components/admin/AssignTrainerDialog";
+import PromoteToInstructorDialog from "@/components/admin/PromoteToInstructorDialog";
 
 interface Member {
   id: string;
@@ -52,7 +53,9 @@ export default function Members() {
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [assignTrainerOpen, setAssignTrainerOpen] = useState(false);
+  const [promoteDialogOpen, setPromoteDialogOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<{ id: string; name: string } | null>(null);
+  const [selectedMemberForPromotion, setSelectedMemberForPromotion] = useState<string | null>(null);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -194,6 +197,11 @@ export default function Members() {
       });
       fetchMembers();
     }
+  };
+
+  const handlePromoteToInstructor = (member: Member) => {
+    setSelectedMemberForPromotion(member.id);
+    setPromoteDialogOpen(true);
   };
 
   const filteredMembers = members.filter((member) => {
@@ -358,14 +366,24 @@ export default function Members() {
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           {!member.is_admin && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleAssignTrainer(member)}
-                              title="Assign trainer"
-                            >
-                              <Users className="h-4 w-4" />
-                            </Button>
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handlePromoteToInstructor(member)}
+                                title="Promote to Instructor"
+                              >
+                                <GraduationCap className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleAssignTrainer(member)}
+                                title="Assign trainer"
+                              >
+                                <Users className="h-4 w-4" />
+                              </Button>
+                            </>
                           )}
                           <Button
                             variant="ghost"
@@ -494,6 +512,20 @@ export default function Members() {
             onSuccess={handleAssignSuccess}
           />
         )}
+
+        {/* Promote to Instructor Dialog */}
+        <PromoteToInstructorDialog
+          open={promoteDialogOpen}
+          onOpenChange={setPromoteDialogOpen}
+          preSelectedUserId={selectedMemberForPromotion || undefined}
+          onSuccess={() => {
+            fetchMembers();
+            toast({
+              title: "Success",
+              description: "User promoted to instructor successfully!",
+            });
+          }}
+        />
       </div>
     </AdminLayout>
   );

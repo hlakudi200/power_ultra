@@ -21,11 +21,13 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
-import { Plus, Edit, Trash2, UserCheck, UserX } from "lucide-react";
+import { Plus, Edit, Trash2, UserCheck, UserX, UserPlus, User } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import PromoteToInstructorDialog from "@/components/admin/PromoteToInstructorDialog";
 
 interface Instructor {
   id: string;
+  user_id?: string;
   name: string;
   email?: string;
   phone?: string;
@@ -41,6 +43,7 @@ export default function Instructors() {
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isPromoteDialogOpen, setIsPromoteDialogOpen] = useState(false);
   const [editingInstructor, setEditingInstructor] = useState<Instructor | null>(null);
   const { toast } = useToast();
 
@@ -232,10 +235,16 @@ export default function Instructors() {
               Manage gym instructors and their information
             </p>
           </div>
-          <Button onClick={handleCreate}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Instructor
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setIsPromoteDialogOpen(true)}>
+              <UserPlus className="h-4 w-4 mr-2" />
+              Promote User
+            </Button>
+            <Button onClick={handleCreate}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Instructor
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -278,7 +287,7 @@ export default function Instructors() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
-                  <TableHead>Phone</TableHead>
+                  <TableHead>Account Type</TableHead>
                   <TableHead>Specialties</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -294,7 +303,17 @@ export default function Instructors() {
                       {instructor.email || "-"}
                     </TableCell>
                     <TableCell>
-                      {instructor.phone || "-"}
+                      {instructor.user_id ? (
+                        <span className="inline-flex items-center gap-1 text-sm text-primary">
+                          <UserCheck className="h-3 w-3" />
+                          Linked
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+                          <User className="h-3 w-3" />
+                          Guest
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="max-w-xs truncate">
                       {instructor.specialties && instructor.specialties.length > 0
@@ -471,6 +490,13 @@ export default function Instructors() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Promote User to Instructor Dialog */}
+        <PromoteToInstructorDialog
+          open={isPromoteDialogOpen}
+          onOpenChange={setIsPromoteDialogOpen}
+          onSuccess={fetchInstructors}
+        />
       </div>
     </AdminLayout>
   );
