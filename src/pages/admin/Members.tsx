@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
-import { Search, UserPlus, Edit, Trash2, Calendar, Users, GraduationCap } from "lucide-react";
+import { Search, UserPlus, Edit, Trash2, Calendar, Users, GraduationCap, UserX } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { AssignTrainerDialog } from "@/components/admin/AssignTrainerDialog";
 import PromoteToInstructorDialog from "@/components/admin/PromoteToInstructorDialog";
@@ -43,6 +43,12 @@ interface Member {
   role: string | null;
   membership_expiry_date: string | null;
   updated_at: string;
+  is_instructor?: boolean;
+  assigned_trainer?: {
+    trainer_id: string;
+    trainer_name: string;
+    assignment_id: string;
+  } | null;
 }
 
 export default function Members() {
@@ -72,21 +78,68 @@ export default function Members() {
 
   const fetchMembers = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+
+    // Fetch profiles with instructor and trainer assignment info
+    const { data: profilesData, error: profilesError } = await supabase
       .from("profiles")
       .select("*")
       .order("updated_at", { ascending: false });
 
-    if (error) {
-      console.error("Error fetching members:", error);
+    if (profilesError) {
+      console.error("Error fetching members:", profilesError);
       toast({
         title: "Error",
         description: "Failed to load members",
         variant: "destructive",
       });
-    } else {
-      setMembers(data || []);
+      setLoading(false);
+      return;
     }
+
+    // Fetch instructor status for each profile
+    const { data: instructorsData } = await supabase
+      .from("instructors")
+      .select("user_id, name");
+
+    // Fetch trainer assignments
+    const { data: assignmentsData } = await supabase
+      .from("trainer_assignments")
+      .select(`
+        id,
+        member_id,
+        trainer_id,
+        status,
+        instructors:trainer_id (
+          name
+        )
+      `)
+      .eq("status", "active");
+
+    // Map instructor data
+    const instructorMap = new Map(
+      instructorsData?.map(i => [i.user_id, true]) || []
+    );
+
+    // Map trainer assignments
+    const assignmentMap = new Map(
+      assignmentsData?.map(a => [
+        a.member_id,
+        {
+          trainer_id: a.trainer_id,
+          trainer_name: (a.instructors as any)?.name || "Unknown",
+          assignment_id: a.id,
+        }
+      ]) || []
+    );
+
+    // Combine data
+    const membersWithDetails = profilesData?.map(profile => ({
+      ...profile,
+      is_instructor: instructorMap.has(profile.id),
+      assigned_trainer: assignmentMap.get(profile.id) || null,
+    })) || [];
+
+    setMembers(membersWithDetails);
     setLoading(false);
   };
 
@@ -204,6 +257,30 @@ export default function Members() {
     setPromoteDialogOpen(true);
   };
 
+  const handleUnassignTrainer = async (assignmentId: string) => {
+    if (!confirm("Are you sure you want to unassign this trainer?")) return;
+
+    const { error } = await supabase
+      .from("trainer_assignments")
+      .update({ status: "completed" })
+      .eq("id", assignmentId);
+
+    if (error) {
+      console.error("Error unassigning trainer:", error);
+      toast({
+        title: "Error",
+        description: "Failed to unassign trainer",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Success",
+        description: "Trainer unassigned successfully",
+      });
+      fetchMembers();
+    }
+  };
+
   const filteredMembers = members.filter((member) => {
     const matchesSearch =
       member.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -213,7 +290,8 @@ export default function Members() {
     const matchesRole =
       filterRole === "all" ||
       (filterRole === "admin" && member.is_admin) ||
-      (filterRole === "member" && !member.is_admin);
+      (filterRole === "instructor" && member.is_instructor) ||
+      (filterRole === "member" && !member.is_admin && !member.is_instructor);
 
     return matchesSearch && matchesRole;
   });
@@ -267,13 +345,14 @@ export default function Members() {
             />
           </div>
           <Select value={filterRole} onValueChange={setFilterRole}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-48">
               <SelectValue placeholder="Filter by role" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Members</SelectItem>
-              <SelectItem value="admin">Admins Only</SelectItem>
-              <SelectItem value="member">Members Only</SelectItem>
+              <SelectItem value="admin">Admins</SelectItem>
+              <SelectItem value="instructor">Instructors</SelectItem>
+              <SelectItem value="member">Regular Members</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -320,8 +399,8 @@ export default function Members() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
-                  <TableHead>Phone</TableHead>
                   <TableHead>Role</TableHead>
+                  <TableHead>Assigned Trainer</TableHead>
                   <TableHead>Membership</TableHead>
                   <TableHead>Last Updated</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -336,14 +415,40 @@ export default function Members() {
                         {member.first_name} {member.last_name}
                       </TableCell>
                       <TableCell>{member.email}</TableCell>
-                      <TableCell>{member.phone || "-"}</TableCell>
                       <TableCell>
-                        {member.is_admin ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                            {member.role?.replace("_", " ") || "Admin"}
-                          </span>
+                        <div className="flex flex-col gap-1">
+                          {member.is_admin && (
+                            <span className="inline-flex items-center w-fit px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                              Admin
+                            </span>
+                          )}
+                          {member.is_instructor && (
+                            <span className="inline-flex items-center w-fit gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                              <GraduationCap className="h-3 w-3" />
+                              Instructor
+                            </span>
+                          )}
+                          {!member.is_admin && !member.is_instructor && (
+                            <span className="text-sm text-muted-foreground">Member</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {member.assigned_trainer ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm">{member.assigned_trainer.trainer_name}</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-destructive hover:text-destructive"
+                              onClick={() => handleUnassignTrainer(member.assigned_trainer!.assignment_id)}
+                              title="Unassign trainer"
+                            >
+                              <UserX className="h-3 w-3" />
+                            </Button>
+                          </div>
                         ) : (
-                          <span className="text-muted-foreground">Member</span>
+                          <span className="text-sm text-muted-foreground">-</span>
                         )}
                       </TableCell>
                       <TableCell>
@@ -365,25 +470,25 @@ export default function Members() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
+                          {!member.is_admin && !member.is_instructor && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handlePromoteToInstructor(member)}
+                              title="Promote to Instructor"
+                            >
+                              <GraduationCap className="h-4 w-4" />
+                            </Button>
+                          )}
                           {!member.is_admin && (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handlePromoteToInstructor(member)}
-                                title="Promote to Instructor"
-                              >
-                                <GraduationCap className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleAssignTrainer(member)}
-                                title="Assign trainer"
-                              >
-                                <Users className="h-4 w-4" />
-                              </Button>
-                            </>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleAssignTrainer(member)}
+                              title="Assign trainer"
+                            >
+                              <Users className="h-4 w-4" />
+                            </Button>
                           )}
                           <Button
                             variant="ghost"
