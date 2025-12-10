@@ -28,10 +28,11 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
-import { Search, UserPlus, Edit, Trash2, Calendar, Users, GraduationCap, UserX } from "lucide-react";
+import { Search, UserPlus, Edit, Trash2, Calendar, Users, GraduationCap, UserX, Zap } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { AssignTrainerDialog } from "@/components/admin/AssignTrainerDialog";
 import PromoteToInstructorDialog from "@/components/admin/PromoteToInstructorDialog";
+import { QuickActivateMembershipDialog } from "@/components/admin/QuickActivateMembershipDialog";
 
 interface Member {
   id: string;
@@ -60,6 +61,7 @@ export default function Members() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [assignTrainerOpen, setAssignTrainerOpen] = useState(false);
   const [promoteDialogOpen, setPromoteDialogOpen] = useState(false);
+  const [quickActivateOpen, setQuickActivateOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<{ id: string; name: string } | null>(null);
   const [selectedMemberForPromotion, setSelectedMemberForPromotion] = useState<string | null>(null);
   const { toast } = useToast();
@@ -320,6 +322,14 @@ export default function Members() {
     fetchMembers();
   };
 
+  const handleQuickActivate = (member: Member) => {
+    setSelectedMember({
+      id: member.id,
+      name: `${member.first_name} ${member.last_name}`,
+    });
+    setQuickActivateOpen(true);
+  };
+
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -481,14 +491,25 @@ export default function Members() {
                             </Button>
                           )}
                           {!member.is_admin && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleAssignTrainer(member)}
-                              title="Assign trainer"
-                            >
-                              <Users className="h-4 w-4" />
-                            </Button>
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleAssignTrainer(member)}
+                                title="Assign trainer"
+                              >
+                                <Users className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleQuickActivate(member)}
+                                title="Quick activate membership"
+                                className="text-primary hover:text-primary"
+                              >
+                                <Zap className="h-4 w-4" />
+                              </Button>
+                            </>
                           )}
                           <Button
                             variant="ghost"
@@ -631,6 +652,17 @@ export default function Members() {
             });
           }}
         />
+
+        {/* Quick Activate Membership Dialog */}
+        {selectedMember && (
+          <QuickActivateMembershipDialog
+            open={quickActivateOpen}
+            onOpenChange={setQuickActivateOpen}
+            memberId={selectedMember.id}
+            memberName={selectedMember.name}
+            onSuccess={handleAssignSuccess}
+          />
+        )}
       </div>
     </AdminLayout>
   );
