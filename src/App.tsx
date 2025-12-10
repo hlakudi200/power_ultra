@@ -23,6 +23,7 @@ import Instructors from "./pages/admin/Instructors";
 import Analytics from "./pages/admin/Analytics";
 import Settings from "./pages/admin/Settings";
 import UpdatePasswordPage from "./pages/UpdatePassword";
+import ActivateMembership from "./pages/ActivateMembership";
 
 import { SessionProvider, useSession } from "./context/SessionProvider";
 import { useToast } from "@/components/ui/use-toast"; // Keep useToast for ProtectedRoute
@@ -210,6 +211,7 @@ const AppRoutes = () => {
         <Route index element={<Index />} /> {/* Index route for / */}
         <Route path="/setup-profile" element={<SetupProfile />} />
         <Route path="/update-password" element={<UpdatePasswordPage />} />
+        <Route path="/activate-membership" element={<ActivateMembership />} />
 
         {/* Protected Routes */}
         <Route
