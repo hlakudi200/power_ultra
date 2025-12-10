@@ -83,12 +83,15 @@ export default function ClassSchedule() {
     if (scheduleData && scheduleData.length > 0) {
       const scheduleWithBookings = await Promise.all(
         scheduleData.map(async (schedule: any) => {
+          const today = new Date().toISOString().split('T')[0];
+
           // Get booking count
           const { count } = await supabase
             .from("bookings")
             .select("*", { count: "exact", head: true })
             .eq("schedule_id", schedule.id)
-            .in("status", ["confirmed", "pending"]);
+            .gte("class_date", today)
+            .eq("status", "confirmed");
 
           // Check if user has booked this class
           const { data: userBooking } = await supabase
@@ -96,8 +99,9 @@ export default function ClassSchedule() {
             .select("id")
             .eq("schedule_id", schedule.id)
             .eq("user_id", session.user.id)
-            .in("status", ["confirmed", "pending"])
-            .single();
+            .gte("class_date", today)
+            .eq("status", "confirmed")
+            .maybeSingle();
 
           // Transform arrays to single objects for type compatibility
           return {

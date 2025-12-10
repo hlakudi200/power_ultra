@@ -97,15 +97,17 @@ export default function Analytics() {
         .gte("created_at", start.toISOString())
         .lte("created_at", end.toISOString());
 
-      // Total bookings
+      // Total bookings (only confirmed)
       const { count: totalBookings } = await supabase
         .from("bookings")
-        .select("*", { count: "exact", head: true });
+        .select("*", { count: "exact", head: true })
+        .eq("status", "confirmed");
 
-      // Bookings in period
+      // Bookings in period (only confirmed)
       const { count: bookingsThisPeriod } = await supabase
         .from("bookings")
         .select("*", { count: "exact", head: true })
+        .eq("status", "confirmed")
         .gte("created_at", start.toISOString())
         .lte("created_at", end.toISOString());
 
@@ -146,6 +148,7 @@ export default function Analytics() {
           )
         `
         )
+        .eq("status", "confirmed")
         .gte("created_at", start.toISOString())
         .lte("created_at", end.toISOString());
 
@@ -171,6 +174,7 @@ export default function Analytics() {
           )
         `
         )
+        .eq("status", "confirmed")
         .gte("created_at", start.toISOString())
         .lte("created_at", end.toISOString());
 

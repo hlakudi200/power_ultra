@@ -50,12 +50,14 @@ export function WaitlistButton({
 
     try {
       // Check if user has an active booking for this class
+      const today = new Date().toISOString().split('T')[0];
       const { data: bookingData, error: bookingError } = await supabase
         .from("bookings")
         .select("id")
         .eq("schedule_id", scheduleId)
         .eq("user_id", session.user.id)
-        .in("status", ["confirmed", "pending"])
+        .gte("class_date", today)
+        .eq("status", "confirmed")
         .maybeSingle();
 
       setHasActiveBooking(!!bookingData);
@@ -104,12 +106,14 @@ export function WaitlistButton({
 
     try {
       // Check if user already has an active booking for this class
+      const today = new Date().toISOString().split('T')[0];
       const { data: existingBooking, error: bookingCheckError } = await supabase
         .from("bookings")
         .select("id, status")
         .eq("schedule_id", scheduleId)
         .eq("user_id", session.user.id)
-        .in("status", ["confirmed", "pending"])
+        .gte("class_date", today)
+        .eq("status", "confirmed")
         .maybeSingle();
 
       if (bookingCheckError) {
