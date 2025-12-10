@@ -82,6 +82,7 @@ const getNextClassOccurrence = (dayOfWeek: string, startTime: string): Date => {
 
 // Fetch user's upcoming bookings with improved date logic
 const fetchUserBookings = async (userId: string) => {
+  const today = new Date().toISOString().split('T')[0];
   const { data, error } = await supabase
     .from("bookings")
     .select(
@@ -89,6 +90,7 @@ const fetchUserBookings = async (userId: string) => {
       id,
       created_at,
       status,
+      class_date,
       schedule (
         id,
         day_of_week,
@@ -104,8 +106,9 @@ const fetchUserBookings = async (userId: string) => {
     `
     )
     .eq("user_id", userId)
-    .in("status", ["confirmed", "pending"])
-    .order("created_at", { ascending: false });
+    .gte("class_date", today)
+    .eq("status", "confirmed")
+    .order("class_date", { ascending: true });
 
   if (error) {
     throw new Error(error.message);
@@ -181,11 +184,13 @@ const fetchSchedule = async () => {
   if (data && data.length > 0) {
     const scheduleWithBookings = await Promise.all(
       data.map(async (schedule: any) => {
+        const today = new Date().toISOString().split('T')[0];
         const { count } = await supabase
           .from("bookings")
           .select("*", { count: "exact", head: true })
           .eq("schedule_id", schedule.id)
-          .in("status", ["confirmed", "pending"]);
+          .gte("class_date", today)
+          .eq("status", "confirmed");
 
         // Transform arrays to single objects for type compatibility
         return {

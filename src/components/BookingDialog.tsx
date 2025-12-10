@@ -44,13 +44,16 @@ const BookingDialog = ({
 
     setIsSubmitting(true);
     try {
-      // First, check if there's an existing cancelled booking
+      // First, check if there's an existing booking for future classes
+      const today = new Date().toISOString().split('T')[0];
       const { data: existingBooking, error: checkError } = await supabase
         .from("bookings")
-        .select("id, status")
+        .select("id, status, class_date")
         .eq("schedule_id", scheduleId)
         .eq("user_id", session.user.id)
-        .single();
+        .gte("class_date", today)
+        .in("status", ["confirmed", "cancelled"])
+        .maybeSingle();
 
       if (checkError && checkError.code !== 'PGRST116') {
         // PGRST116 = no rows returned, which is fine

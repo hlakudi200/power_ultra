@@ -145,11 +145,13 @@ export default function Schedule() {
     if (data && data.length > 0) {
       const scheduleWithBookings = await Promise.all(
         data.map(async (schedule) => {
+          const today = new Date().toISOString().split('T')[0];
           const { count } = await supabase
             .from("bookings")
             .select("*", { count: "exact", head: true })
             .eq("schedule_id", schedule.id)
-            .in("status", ["confirmed", "pending"]);
+            .gte("class_date", today)
+            .eq("status", "confirmed");
 
           return {
             ...schedule,
