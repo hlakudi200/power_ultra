@@ -14,8 +14,9 @@ import ClassCard from "@/components/ClassCard";
 import BookingDialog from "@/components/BookingDialog";
 import { MyTrainer } from "@/components/MyTrainer";
 import { UserAvatar } from "@/components/UserAvatar";
+import { MembershipActivationPrompt } from "@/components/MembershipActivationPrompt";
 import { ScheduledClass } from "@/types/supabase";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 
 // Fetch user profile data
@@ -224,6 +225,7 @@ const Dashboard = () => {
   const { toast } = useToast();
   const [showBookingSection, setShowBookingSection] = useState(false);
   const [selectedDay, setSelectedDay] = useState("monday");
+  const [showActivationPrompt, setShowActivationPrompt] = useState(false);
   const [bookingDialog, setBookingDialog] = useState<{
     open: boolean;
     className: string;
@@ -269,6 +271,18 @@ const Dashboard = () => {
     queryFn: fetchSchedule,
     enabled: showBookingSection,
   });
+
+  // Check if user has active membership and show prompt if not
+  useEffect(() => {
+    if (profile && !isProfileLoading) {
+      const hasActiveMembership = profile.membership_expiry_date &&
+        new Date(profile.membership_expiry_date) > new Date();
+
+      if (!hasActiveMembership) {
+        setShowActivationPrompt(true);
+      }
+    }
+  }, [profile, isProfileLoading]);
 
   if (loading || isProfileLoading || isBookingsLoading) {
     return (
@@ -644,6 +658,14 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Membership Activation Prompt for Non-Members */}
+      <MembershipActivationPrompt
+        open={showActivationPrompt}
+        onOpenChange={setShowActivationPrompt}
+        userName={profile?.first_name || firstName}
+      />
+
       <BookingDialog
         open={bookingDialog.open}
         onOpenChange={(open) => {
