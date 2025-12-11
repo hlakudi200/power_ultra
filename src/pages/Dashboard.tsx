@@ -278,6 +278,12 @@ const Dashboard = () => {
       const hasActiveMembership = profile.membership_expiry_date &&
         new Date(profile.membership_expiry_date) > new Date();
 
+      console.log("Membership check:", {
+        membership_expiry_date: profile.membership_expiry_date,
+        hasActiveMembership,
+        willShowPrompt: !hasActiveMembership
+      });
+
       if (!hasActiveMembership) {
         setShowActivationPrompt(true);
       }
