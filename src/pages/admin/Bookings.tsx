@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Pagination } from "@/components/Pagination";
 import {
   Table,
   TableBody,
@@ -49,6 +50,10 @@ export default function Bookings() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const { toast } = useToast();
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
 
   useEffect(() => {
     fetchBookings();
@@ -132,24 +137,37 @@ export default function Bookings() {
     }
   };
 
-  const filteredBookings = bookings.filter((booking) => {
-    const matchesSearch =
-      booking.profiles?.first_name
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      booking.profiles?.last_name
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      booking.profiles?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      booking.schedule?.classes?.name
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase());
+  const filteredBookings = useMemo(() => {
+    return bookings.filter((booking) => {
+      const matchesSearch =
+        booking.profiles?.first_name
+          ?.toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        booking.profiles?.last_name
+          ?.toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        booking.profiles?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        booking.schedule?.classes?.name
+          ?.toLowerCase()
+          .includes(searchTerm.toLowerCase());
 
-    const matchesStatus =
-      filterStatus === "all" || booking.status === filterStatus;
+      const matchesStatus =
+        filterStatus === "all" || booking.status === filterStatus;
 
-    return matchesSearch && matchesStatus;
-  });
+      return matchesSearch && matchesStatus;
+    });
+  }, [bookings, searchTerm, filterStatus]);
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredBookings.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedBookings = filteredBookings.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterStatus]);
 
   const getStatusBadge = (status: string) => {
     // Handle undefined or null status
@@ -267,7 +285,7 @@ export default function Bookings() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredBookings.map((booking) => (
+                {paginatedBookings.map((booking) => (
                   <TableRow key={booking.id}>
                     <TableCell>
                       <div>
@@ -339,6 +357,18 @@ export default function Bookings() {
                 ))}
               </TableBody>
             </Table>
+          )}
+
+          {/* Pagination */}
+          {!loading && filteredBookings.length > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredBookings.length}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              onItemsPerPageChange={setItemsPerPage}
+            />
           )}
         </div>
       </div>
