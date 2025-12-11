@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Pagination } from "@/components/Pagination";
 import {
   Table,
   TableBody,
@@ -62,6 +63,14 @@ export default function Inquiries() {
   const [viewingInquiry, setViewingInquiry] =
     useState<MembershipInquiry | null>(null);
   const { toast } = useToast();
+
+  // Pagination state for contact submissions
+  const [contactPage, setContactPage] = useState(1);
+  const [contactItemsPerPage, setContactItemsPerPage] = useState(25);
+
+  // Pagination state for membership inquiries
+  const [inquiryPage, setInquiryPage] = useState(1);
+  const [inquiryItemsPerPage, setInquiryItemsPerPage] = useState(25);
 
   useEffect(() => {
     fetchInquiries();
@@ -147,19 +156,47 @@ export default function Inquiries() {
     }
   };
 
-  const filteredContacts = contactSubmissions.filter(
-    (contact) =>
-      contact.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contact.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contact.subject?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter contact submissions with useMemo
+  const filteredContacts = useMemo(() => {
+    return contactSubmissions.filter(
+      (contact) =>
+        contact.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        contact.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        contact.subject?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [contactSubmissions, searchTerm]);
 
-  const filteredInquiries = membershipInquiries.filter(
-    (inquiry) =>
-      inquiry.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      inquiry.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      inquiry.interested_plan?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter membership inquiries with useMemo
+  const filteredInquiries = useMemo(() => {
+    return membershipInquiries.filter(
+      (inquiry) =>
+        inquiry.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        inquiry.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        inquiry.interested_plan?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [membershipInquiries, searchTerm]);
+
+  // Calculate pagination for contact submissions
+  const contactTotalPages = Math.ceil(filteredContacts.length / contactItemsPerPage);
+  const paginatedContacts = useMemo(() => {
+    const startIndex = (contactPage - 1) * contactItemsPerPage;
+    const endIndex = startIndex + contactItemsPerPage;
+    return filteredContacts.slice(startIndex, endIndex);
+  }, [filteredContacts, contactPage, contactItemsPerPage]);
+
+  // Calculate pagination for membership inquiries
+  const inquiryTotalPages = Math.ceil(filteredInquiries.length / inquiryItemsPerPage);
+  const paginatedInquiries = useMemo(() => {
+    const startIndex = (inquiryPage - 1) * inquiryItemsPerPage;
+    const endIndex = startIndex + inquiryItemsPerPage;
+    return filteredInquiries.slice(startIndex, endIndex);
+  }, [filteredInquiries, inquiryPage, inquiryItemsPerPage]);
+
+  // Reset to page 1 when search term changes
+  useEffect(() => {
+    setContactPage(1);
+    setInquiryPage(1);
+  }, [searchTerm]);
 
   return (
     <AdminLayout>
@@ -234,56 +271,66 @@ export default function Inquiries() {
                   No contact submissions found
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Phone</TableHead>
-                      <TableHead>Subject</TableHead>
-                      <TableHead>Received</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredContacts.map((contact) => (
-                      <TableRow key={contact.id}>
-                        <TableCell className="font-medium">
-                          {contact.name}
-                        </TableCell>
-                        <TableCell>{contact.email}</TableCell>
-                        <TableCell>{contact.phone || "-"}</TableCell>
-                        <TableCell className="max-w-xs truncate">
-                          {contact.subject}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {formatDistanceToNow(new Date(contact.created_at), {
-                            addSuffix: true,
-                          })}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setViewingContact(contact)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteContact(contact.id)}
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Phone</TableHead>
+                        <TableHead>Subject</TableHead>
+                        <TableHead>Received</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedContacts.map((contact) => (
+                        <TableRow key={contact.id}>
+                          <TableCell className="font-medium">
+                            {contact.name}
+                          </TableCell>
+                          <TableCell>{contact.email}</TableCell>
+                          <TableCell>{contact.phone || "-"}</TableCell>
+                          <TableCell className="max-w-xs truncate">
+                            {contact.subject}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {formatDistanceToNow(new Date(contact.created_at), {
+                              addSuffix: true,
+                            })}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setViewingContact(contact)}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteContact(contact.id)}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  <Pagination
+                    currentPage={contactPage}
+                    totalPages={contactTotalPages}
+                    totalItems={filteredContacts.length}
+                    itemsPerPage={contactItemsPerPage}
+                    onPageChange={setContactPage}
+                    onItemsPerPageChange={setContactItemsPerPage}
+                  />
+                </>
               )}
             </div>
           </TabsContent>
@@ -300,58 +347,68 @@ export default function Inquiries() {
                   No membership inquiries found
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Phone</TableHead>
-                      <TableHead>Interested Plan</TableHead>
-                      <TableHead>Received</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredInquiries.map((inquiry) => (
-                      <TableRow key={inquiry.id}>
-                        <TableCell className="font-medium">
-                          {inquiry.name}
-                        </TableCell>
-                        <TableCell>{inquiry.email}</TableCell>
-                        <TableCell>{inquiry.phone}</TableCell>
-                        <TableCell>
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary capitalize">
-                            {inquiry.interested_plan}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {formatDistanceToNow(new Date(inquiry.created_at), {
-                            addSuffix: true,
-                          })}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setViewingInquiry(inquiry)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteInquiry(inquiry.id)}
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Phone</TableHead>
+                        <TableHead>Interested Plan</TableHead>
+                        <TableHead>Received</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedInquiries.map((inquiry) => (
+                        <TableRow key={inquiry.id}>
+                          <TableCell className="font-medium">
+                            {inquiry.name}
+                          </TableCell>
+                          <TableCell>{inquiry.email}</TableCell>
+                          <TableCell>{inquiry.phone}</TableCell>
+                          <TableCell>
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary capitalize">
+                              {inquiry.interested_plan}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {formatDistanceToNow(new Date(inquiry.created_at), {
+                              addSuffix: true,
+                            })}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setViewingInquiry(inquiry)}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteInquiry(inquiry.id)}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  <Pagination
+                    currentPage={inquiryPage}
+                    totalPages={inquiryTotalPages}
+                    totalItems={filteredInquiries.length}
+                    itemsPerPage={inquiryItemsPerPage}
+                    onPageChange={setInquiryPage}
+                    onItemsPerPageChange={setInquiryItemsPerPage}
+                  />
+                </>
               )}
             </div>
           </TabsContent>

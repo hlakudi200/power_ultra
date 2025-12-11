@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Pagination } from "@/components/Pagination";
 import {
   Table,
   TableBody,
@@ -67,6 +68,10 @@ export default function Members() {
   const [selectedMember, setSelectedMember] = useState<{ id: string; name: string } | null>(null);
   const [selectedMemberForPromotion, setSelectedMemberForPromotion] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
 
   const [formData, setFormData] = useState({
     first_name: "",
@@ -285,20 +290,33 @@ export default function Members() {
     }
   };
 
-  const filteredMembers = members.filter((member) => {
-    const matchesSearch =
-      member.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      member.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      member.email?.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredMembers = useMemo(() => {
+    return members.filter((member) => {
+      const matchesSearch =
+        member.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        member.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        member.email?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesRole =
-      filterRole === "all" ||
-      (filterRole === "admin" && member.is_admin) ||
-      (filterRole === "instructor" && member.is_instructor) ||
-      (filterRole === "member" && !member.is_admin && !member.is_instructor);
+      const matchesRole =
+        filterRole === "all" ||
+        (filterRole === "admin" && member.is_admin) ||
+        (filterRole === "instructor" && member.is_instructor) ||
+        (filterRole === "member" && !member.is_admin && !member.is_instructor);
 
-    return matchesSearch && matchesRole;
-  });
+      return matchesSearch && matchesRole;
+    });
+  }, [members, searchTerm, filterRole]);
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredMembers.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedMembers = filteredMembers.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterRole]);
 
   const getMembershipStatus = (expiryDate: string | null) => {
     if (!expiryDate) return { text: "No Membership", color: "text-gray-500" };
@@ -427,7 +445,7 @@ export default function Members() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredMembers.map((member) => {
+                {paginatedMembers.map((member) => {
                   const status = getMembershipStatus(member.membership_expiry_date);
                   return (
                     <TableRow key={member.id}>
@@ -560,6 +578,18 @@ export default function Members() {
                 })}
               </TableBody>
             </Table>
+          )}
+
+          {/* Pagination */}
+          {!loading && filteredMembers.length > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredMembers.length}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              onItemsPerPageChange={setItemsPerPage}
+            />
           )}
         </div>
 
