@@ -27,7 +27,7 @@ interface ExpiringMembership {
   email: string;
   full_name: string;
   membership_expiry_date: string;
-  current_membership_id: string;
+  membership_id: string;
 }
 
 interface MembershipPlan {
@@ -55,7 +55,7 @@ serve(async (req) => {
     // Find all users whose membership expires in exactly 5 days
     const { data: expiringUsers, error: queryError } = await supabase
       .from("profiles")
-      .select("id, email, full_name, membership_expiry_date, current_membership_id")
+      .select("id, email, full_name, membership_expiry_date, membership_id")
       .eq("membership_expiry_date", targetDateString)
       .not("email", "is", null);
 
@@ -85,7 +85,7 @@ serve(async (req) => {
     const membershipIds = [
       ...new Set(
         expiringUsers
-          .map((u) => u.current_membership_id)
+          .map((u) => u.membership_id)
           .filter((id) => id !== null)
       ),
     ];
@@ -113,8 +113,8 @@ serve(async (req) => {
 
     for (const user of expiringUsers as ExpiringMembership[]) {
       try {
-        const membershipPlan = user.current_membership_id
-          ? membershipMap.get(user.current_membership_id)
+        const membershipPlan = user.membership_id
+          ? membershipMap.get(user.membership_id)
           : null;
 
         const userName = user.full_name || user.email.split("@")[0];
