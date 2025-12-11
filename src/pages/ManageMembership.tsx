@@ -166,14 +166,14 @@ const ManageMembership = () => {
                     <div>
                       <p className="text-sm text-muted-foreground mb-1">Monthly Price</p>
                       <p className="text-xl font-semibold text-foreground">
-                        R{profile.memberships.price.toFixed(2)} / month
+                        R{profile.memberships.price?.toFixed(2) ?? "0.00"} / month
                       </p>
                     </div>
 
                     <div>
                       <p className="text-sm text-muted-foreground mb-1">Duration</p>
                       <p className="text-xl font-semibold text-foreground">
-                        {profile.memberships.duration_months} {profile.memberships.duration_months === 1 ? "month" : "months"}
+                        {profile.memberships.duration_months ?? 0} {profile.memberships.duration_months === 1 ? "month" : "months"}
                       </p>
                     </div>
                   </div>
