@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Dumbbell, CalendarDays, User, Package, Clock, Hash, MapPin, Loader2, Info, Plus, Sparkles } from "lucide-react";
+import { Dumbbell, CalendarDays, User, Package, Clock, Hash, MapPin, Loader2, Info, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/components/ui/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -503,14 +503,7 @@ const Dashboard = () => {
               </CardHeader>
               <CardContent className="pt-6 space-y-4 text-foreground">
                 {getMembershipStatusContent()}
-                <div className="space-y-2 mt-4">
-                  <Button
-                    onClick={() => navigate("/activate-membership")}
-                    className="w-full bg-gradient-primary text-primary-foreground hover:shadow-glow font-bold gap-2"
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    Activate Membership Code
-                  </Button>
+                <div className="mt-4">
                   <Button variant="outline" className="w-full border-primary text-primary hover:bg-primary/10">
                     Manage Membership
                   </Button>
