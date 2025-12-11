@@ -126,10 +126,50 @@ export const GenerateActivationCodeDialog = ({
       if (data && data.length > 0 && data[0].success) {
         const code = data[0].code;
         setGeneratedCode(code);
-        toast({
-          title: "Code Generated!",
-          description: `Activation code created for ${memberName}`,
-        });
+
+        // Send email with activation code
+        try {
+          const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+          const emailResponse = await fetch(
+            `${SUPABASE_URL}/functions/v1/send-activation-code`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+              },
+              body: JSON.stringify({
+                memberName,
+                memberEmail,
+                activationCode: code,
+                membershipName: data[0].membership_name,
+                durationMonths: customDuration || selectedMembership?.duration_months,
+                expiresAt: data[0].expires_at,
+              }),
+            }
+          );
+
+          if (emailResponse.ok) {
+            toast({
+              title: "Code Generated & Sent!",
+              description: `Activation code created and emailed to ${memberName}`,
+            });
+          } else {
+            // Code generated but email failed - still show success
+            toast({
+              title: "Code Generated!",
+              description: `Activation code created for ${memberName}. Email delivery failed - please share the code manually.`,
+            });
+          }
+        } catch (emailError) {
+          console.error("Email send error:", emailError);
+          // Code generated but email failed - still show success
+          toast({
+            title: "Code Generated!",
+            description: `Activation code created for ${memberName}. Email delivery failed - please share the code manually.`,
+          });
+        }
+
         onSuccess();
       } else {
         throw new Error(data[0]?.message || "Failed to generate code");
