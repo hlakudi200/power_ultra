@@ -504,7 +504,11 @@ const Dashboard = () => {
               <CardContent className="pt-6 space-y-4 text-foreground">
                 {getMembershipStatusContent()}
                 <div className="mt-4">
-                  <Button variant="outline" className="w-full border-primary text-primary hover:bg-primary/10">
+                  <Button
+                    variant="outline"
+                    className="w-full border-primary text-primary hover:bg-primary/10"
+                    onClick={() => navigate("/manage-membership")}
+                  >
                     Manage Membership
                   </Button>
                 </div>
