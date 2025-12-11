@@ -10,7 +10,6 @@ import WorkoutPlanPage from "./pages/WorkoutPlanPage";
 import TrainerDashboard from "./pages/TrainerDashboard";
 import ClientDetailView from "./pages/trainer/ClientDetailView";
 import Layout from "./components/Layout"; // Import the Layout component
-import MembershipsPage from "./pages/Memberships";
 import ManageMembership from "./pages/ManageMembership";
 
 // Admin imports
@@ -200,7 +199,6 @@ const AppRoutes = () => {
         <Route path="/setup-profile" element={<SetupProfile />} />
         <Route path="/update-password" element={<UpdatePasswordPage />} />
         <Route path="/activate-membership" element={<ActivateMembership />} />
-        <Route path="/memberships" element={<MembershipsPage />} />
 
         {/* Protected Routes */}
         <Route
