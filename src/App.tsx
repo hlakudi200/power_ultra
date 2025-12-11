@@ -158,15 +158,9 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
         return;
       }
 
-      // Check membership for non-admin, non-trainer users trying to access dashboard
-      if (!userRole.isAdmin && !userRole.isTrainer && !hasActiveMembership && currentPath === "/dashboard") {
-        navigate("/");
-        toast({
-          title: "Access Denied",
-          description: "An active membership is required to access the dashboard.",
-          variant: "destructive",
-        });
-      }
+      // Allow users without membership to access dashboard
+      // Dashboard will show activation prompt for non-members
+      // No redirect needed - let Dashboard handle the UX
     }
   }, [isMembershipChecked, hasActiveMembership, isProfileLoading, userRole, location.pathname, navigate, toast]);
 
@@ -174,7 +168,9 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
     return <div className="min-h-screen flex items-center justify-center bg-background text-foreground">Loading user permissions...</div>;
   }
 
-  return session && (hasActiveMembership || userRole?.isAdmin || userRole?.isTrainer) ? children : null;
+  // Allow all authenticated users to access their appropriate dashboards
+  // Dashboard component will handle showing activation prompt for non-members
+  return session ? children : null;
 };
 
 // This component handles the redirection logic for new users and all app routes
