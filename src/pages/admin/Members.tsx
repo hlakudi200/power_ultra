@@ -28,11 +28,12 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
-import { Search, UserPlus, Edit, Trash2, Calendar, Users, GraduationCap, UserX, Zap } from "lucide-react";
+import { Search, UserPlus, Edit, Trash2, Calendar, Users, GraduationCap, UserX, Zap, Ticket } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { AssignTrainerDialog } from "@/components/admin/AssignTrainerDialog";
 import PromoteToInstructorDialog from "@/components/admin/PromoteToInstructorDialog";
 import { QuickActivateMembershipDialog } from "@/components/admin/QuickActivateMembershipDialog";
+import { GenerateActivationCodeDialog } from "@/components/admin/GenerateActivationCodeDialog";
 
 interface Member {
   id: string;
@@ -62,6 +63,7 @@ export default function Members() {
   const [assignTrainerOpen, setAssignTrainerOpen] = useState(false);
   const [promoteDialogOpen, setPromoteDialogOpen] = useState(false);
   const [quickActivateOpen, setQuickActivateOpen] = useState(false);
+  const [generateCodeOpen, setGenerateCodeOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<{ id: string; name: string } | null>(null);
   const [selectedMemberForPromotion, setSelectedMemberForPromotion] = useState<string | null>(null);
   const { toast } = useToast();
@@ -330,6 +332,14 @@ export default function Members() {
     setQuickActivateOpen(true);
   };
 
+  const handleGenerateCode = (member: Member) => {
+    setSelectedMember({
+      id: member.id,
+      name: `${member.first_name} ${member.last_name}`,
+    });
+    setGenerateCodeOpen(true);
+  };
+
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -509,6 +519,15 @@ export default function Members() {
                               >
                                 <Zap className="h-4 w-4" />
                               </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleGenerateCode(member)}
+                                title="Generate activation code"
+                                className="text-green-600 hover:text-green-600"
+                              >
+                                <Ticket className="h-4 w-4" />
+                              </Button>
                             </>
                           )}
                           <Button
@@ -660,6 +679,18 @@ export default function Members() {
             onOpenChange={setQuickActivateOpen}
             memberId={selectedMember.id}
             memberName={selectedMember.name}
+            onSuccess={handleAssignSuccess}
+          />
+        )}
+
+        {/* Generate Activation Code Dialog */}
+        {selectedMember && (
+          <GenerateActivationCodeDialog
+            open={generateCodeOpen}
+            onOpenChange={setGenerateCodeOpen}
+            memberId={selectedMember.id}
+            memberName={selectedMember.name}
+            memberEmail={members.find(m => m.id === selectedMember.id)?.email || ""}
             onSuccess={handleAssignSuccess}
           />
         )}
