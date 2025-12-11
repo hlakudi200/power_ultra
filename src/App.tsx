@@ -80,24 +80,14 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
       }, 5000); // 5 second timeout
 
       try {
-        // Fetch user profile with timeout
+        // Fetch user profile
         console.log('[ProtectedRoute] Fetching profile from database...');
 
-        const profilePromise = supabase
+        const { data: profile, error: profileError } = await supabase
           .from("profiles")
           .select("membership_expiry_date, is_admin, role")
           .eq("id", session.user.id)
           .single();
-
-        const profileTimeoutPromise = new Promise<{ data: null; error: { message: string; code: string } }>((_, reject) =>
-          setTimeout(() => {
-            console.error('[ProtectedRoute] Profile query TIMEOUT - RLS issue detected');
-            reject({ data: null, error: { message: 'Query timeout', code: 'TIMEOUT' } });
-          }, 3000)
-        );
-
-        const profileResult = await Promise.race([profilePromise, profileTimeoutPromise]);
-        const { data: profile, error: profileError } = profileResult;
 
         console.log('[ProtectedRoute] Profile fetch result:', { profile, profileError });
 
