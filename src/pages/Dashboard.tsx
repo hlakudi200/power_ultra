@@ -22,7 +22,7 @@ import { useState } from "react";
 const fetchUserProfile = async (userId: string) => {
   const { data, error } = await supabase
     .from("profiles")
-    .select("first_name, last_name, email, phone, membership_expiry_date, avatar_url, memberships(name)")
+    .select("first_name, last_name, email, phone, membership_expiry_date, avatar_url, memberships!profiles_membership_id_fkey(name)")
     .eq("id", userId)
     .single();
   if (error) {
