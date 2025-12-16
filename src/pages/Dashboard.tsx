@@ -181,17 +181,38 @@ const fetchSchedule = async () => {
     throw new Error("Failed to fetch schedule: " + error.message);
   }
 
+  // Helper function to calculate next occurrence of a day
+  const getNextOccurrence = (dayOfWeek: string): string => {
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const today = new Date();
+    const todayDay = today.getDay();
+    const targetDay = days.indexOf(dayOfWeek.toLowerCase());
+
+    let daysUntilTarget = targetDay - todayDay;
+    if (daysUntilTarget <= 0) {
+      daysUntilTarget += 7; // Next week
+    }
+
+    const nextDate = new Date(today);
+    nextDate.setDate(today.getDate() + daysUntilTarget);
+
+    return nextDate.toISOString().split('T')[0];
+  };
+
   // Fetch booking counts for each schedule
   if (data && data.length > 0) {
     const scheduleWithBookings = await Promise.all(
       data.map(async (schedule: any) => {
-        const today = new Date().toISOString().split('T')[0];
+        // Calculate the next occurrence date for this class
+        const nextOccurrence = getNextOccurrence(schedule.day_of_week);
+
+        // Count bookings for the next occurrence only
         const { count } = await supabase
           .from("bookings")
           .select("*", { count: "exact", head: true })
           .eq("schedule_id", schedule.id)
-          .gte("class_date", today)
-          .eq("status", "confirmed");
+          .eq("class_date", nextOccurrence)
+          .in("status", ["confirmed", "pending"]);
 
         // Transform arrays to single objects for type compatibility
         return {

@@ -18,6 +18,7 @@ import Members from "./pages/admin/Members";
 import Classes from "./pages/admin/Classes";
 import Schedule from "./pages/admin/Schedule";
 import Bookings from "./pages/admin/Bookings";
+import BookingCalendar from "./pages/admin/BookingCalendar";
 import Inquiries from "./pages/admin/Inquiries";
 import Memberships from "./pages/admin/Memberships";
 import Instructors from "./pages/admin/Instructors";
@@ -252,6 +253,7 @@ const AppRoutes = () => {
       <Route path="/admin/classes" element={<Classes />} />
       <Route path="/admin/schedule" element={<Schedule />} />
       <Route path="/admin/bookings" element={<Bookings />} />
+      <Route path="/admin/booking-calendar" element={<BookingCalendar />} />
       <Route path="/admin/inquiries" element={<Inquiries />} />
       <Route path="/admin/memberships" element={<Memberships />} />
       <Route path="/admin/instructors" element={<Instructors />} />
